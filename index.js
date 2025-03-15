@@ -98,7 +98,7 @@ app.get('/portais-relevantes', async (req, res) => {
     if (type === 'positivas') {
       whereClause = ' AND pontos > 0';
     } else if (type === 'negativas') {
-      orderByClause = 'ORDER BY total_pontuacao ASC'; // Ordenar em ordem crescente para menores pontuações
+      orderByClause = 'ORDER BY total_pontuacao ASC';
     }
 
     query += whereClause + ' GROUP BY portal ' + orderByClause;
@@ -112,19 +112,56 @@ app.get('/portais-relevantes', async (req, res) => {
 
     let top5, bottom5;
     if (type === 'positivas') {
-      top5 = data.slice(0, 5); // Top 5 com maior pontuação positiva
+      top5 = data.slice(0, 5);
       bottom5 = [];
     } else if (type === 'negativas') {
-      bottom5 = data.slice(0, 5); // Top 5 com menor pontuação total (independente de ser negativa)
+      bottom5 = data.slice(0, 5);
       top5 = [];
     } else {
-      top5 = data.slice(0, 5); // Top 5 com maior pontuação total
-      bottom5 = data.slice(-5).reverse(); // Top 5 com menor pontuação total
+      top5 = data.slice(0, 5);
+      bottom5 = data.slice(-5).reverse();
     }
 
     res.json({ top5, bottom5 });
   } catch (error) {
     console.error('Erro ao buscar portais relevantes:', error);
+    res.status(500).send('Erro no servidor');
+  }
+});
+
+// Nova rota para buscar notícias
+app.get('/noticias', async (req, res) => {
+  try {
+    const { from, to } = req.query;
+
+    // Definir intervalo padrão (últimos 30 dias) se não fornecido
+    let queryFrom = from || new Date(new Date().setDate(new Date().getDate() - 30)).toISOString().split('T')[0];
+    let queryTo = to || new Date().toISOString().split('T')[0];
+
+    const result = await pool.query(
+      `
+        SELECT id, created_at AS data, portal AS veiculo, titulo, editoria, autor, sentimento, abrangencia AS alcance
+        FROM noticias
+        WHERE created_at BETWEEN $1 AND $2
+        ORDER BY created_at DESC
+      `,
+      [queryFrom, queryTo]
+    );
+
+    const data = result.rows.map(row => ({
+      id: row.id.toString(),
+      data: row.data,
+      veiculo: row.veiculo,
+      titulo: row.titulo,
+      editoria: row.editoria,
+      autor: row.autor,
+      sentimento: row.sentimento,
+      alcance: row.alcance ? row.alcance.toString() + 'K' : '0K'
+    }));
+
+    res.json(data);
+  } catch (error) {
+    console.error('Erro ao buscar notícias:', error);
     res.status(500).send('Erro no servidor');
   }
 });
