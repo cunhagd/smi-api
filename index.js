@@ -3,24 +3,20 @@ const { Pool } = require('pg');
 const app = express();
 const port = process.env.PORT || 3000;
 
-// Adicionar suporte a CORS
 app.use((req, res, next) => {
   res.header('Access-Control-Allow-Origin', '*');
   res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
   next();
 });
 
-// Conexão com o banco PostgreSQL
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL
 });
 
-// Rota para pegar o total de menções
 app.get('/metrics', async (req, res) => {
   try {
     const { type, from, to } = req.query;
 
-    // Definir intervalo padrão (últimos 30 dias) se não fornecido
     let queryFrom = from || new Date(new Date().setDate(new Date().getDate() - 30)).toISOString().split('T')[0];
     let queryTo = to || new Date().toISOString().split('T')[0];
 
@@ -52,17 +48,16 @@ app.get('/metrics', async (req, res) => {
       res.status(400).send('Tipo de métrica inválido');
     }
   } catch (error) {
-    console.error('Erro ao buscar métricas:', error);
-    res.status(500).send('Erro no servidor');
+    console.error('Erro ao buscar métricas:', error.message);
+    console.error('Stack trace:', error.stack);
+    res.status(500).json({ error: error.message });
   }
 });
 
-// Rota para a pontuação total
 app.get('/pontuacao-total', async (req, res) => {
   try {
     const { from, to } = req.query;
 
-    // Definir intervalo padrão (últimos 30 dias) se não fornecido
     let queryFrom = from || new Date(new Date().setDate(new Date().getDate() - 30)).toISOString().split('T')[0];
     let queryTo = to || new Date().toISOString().split('T')[0];
 
@@ -73,17 +68,16 @@ app.get('/pontuacao-total', async (req, res) => {
     const totalPontuacao = parseFloat(result.rows[0].total_pontuacao) || 0;
     res.json({ total_pontuacao: totalPontuacao });
   } catch (error) {
-    console.error('Erro ao buscar pontuação total:', error);
-    res.status(500).send('Erro no servidor');
+    console.error('Erro ao buscar pontuação total:', error.message);
+    console.error('Stack trace:', error.stack);
+    res.status(500).json({ error: error.message });
   }
 });
 
-// Rota para portais relevantes
 app.get('/portais-relevantes', async (req, res) => {
   try {
     const { from, to, type } = req.query;
 
-    // Definir intervalo padrão (últimos 30 dias) se não fornecido
     let queryFrom = from || new Date(new Date().setDate(new Date().getDate() - 30)).toISOString().split('T')[0];
     let queryTo = to || new Date().toISOString().split('T')[0];
 
@@ -124,45 +118,55 @@ app.get('/portais-relevantes', async (req, res) => {
 
     res.json({ top5, bottom5 });
   } catch (error) {
-    console.error('Erro ao buscar portais relevantes:', error);
-    res.status(500).send('Erro no servidor');
+    console.error('Erro ao buscar portais relevantes:', error.message);
+    console.error('Stack trace:', error.stack);
+    res.status(500).json({ error: error.message });
   }
 });
 
-// Rota para buscar notícias
 app.get('/noticias', async (req, res) => {
   try {
     const { from, to } = req.query;
 
-    // Definir intervalo padrão (últimos 30 dias) se não fornecido
     let queryFrom = from || new Date(new Date().setDate(new Date().getDate() - 30)).toISOString().split('T')[0];
     let queryTo = to || new Date().toISOString().split('T')[0];
 
+    console.log('Intervalo de busca na API:', { queryFrom, queryTo });
+
     const result = await pool.query(
       `
-        SELECT id, created_at AS data, portal, titulo, link, pontos, sentimento, abrangencia
+        SELECT id, created_at AS data, portal, titulo, pontos, abrangencia
         FROM noticias
-        WHERE created_at BETWEEN $1 AND $2
+        WHERE created_at >= $1 AND created_at <= $2
         ORDER BY created_at DESC
       `,
-      [queryFrom, queryTo]
+      [queryFrom + ' 00:00:00', queryTo + ' 23:59:59']
     );
 
-    const data = result.rows.map(row => ({
-      id: row.id.toString(),
-      data: row.data,
-      portal: row.portal,
-      titulo: row.titulo,
-      link: row.link,
-      pontos: row.pontos,
-      sentimento: row.sentimento,
-      abrangencia: row.abrangencia ? row.abrangencia.toString() : '0'
-    }));
+    console.log('Registros encontrados na API:', result.rows.length);
+    console.log('Primeiro registro (se houver):', result.rows[0] || 'Nenhum registro');
+
+    const data = result.rows.map((row, index) => {
+      try {
+        return {
+          id: row.id ? row.id.toString() : '',
+          data: row.data || '',
+          portal: row.portal || '',
+          titulo: row.titulo || '',
+          pontos: row.pontos != null ? row.pontos.toString() : '0',
+          abrangencia: row.abrangencia != null ? row.abrangencia.toString() : '0'
+        };
+      } catch (mapError) {
+        console.error(`Erro ao mapear linha ${index}:`, mapError);
+        return null;
+      }
+    }).filter(row => row !== null);
 
     res.json(data);
   } catch (error) {
-    console.error('Erro ao buscar notícias:', error);
-    res.status(500).send('Erro no servidor');
+    console.error('Erro ao buscar notícias:', error.message);
+    console.error('Stack trace:', error.stack);
+    res.status(500).json({ error: error.message });
   }
 });
 
