@@ -18,21 +18,39 @@ const pool = new Pool({
 // Rota para pegar as métricas
 app.get('/metrics', async (req, res) => {
   try {
-    // Obter parâmetros de data da query string
-    const { from, to } = req.query;
+    const { type, from, to } = req.query;
 
-    let query = 'SELECT COUNT(*) as total_mencoes FROM noticias';
-    let queryParams = [];
+    // Definir intervalo padrão (últimos 30 dias) se não fornecido
+    let queryFrom = from || new Date(new Date().setDate(new Date().getDate() - 30)).toISOString().split('T')[0];
+    let queryTo = to || new Date().toISOString().split('T')[0];
 
-    // Se from e to forem fornecidos, adicionar filtro de data
-    if (from && to) {
-      query += ' WHERE created_at BETWEEN $1 AND $2';
-      queryParams = [from, to];
+    if (type === 'total-mencoes') {
+      const result = await pool.query(
+        'SELECT COUNT(*) as total_mencoes FROM noticias WHERE created_at BETWEEN $1 AND $2',
+        [queryFrom, queryTo]
+      );
+      res.json({ total_mencoes: parseInt(result.rows[0].total_mencoes) || 0 });
+    } else if (type === 'mencoes-por-periodo') {
+      const result = await pool.query(
+        `
+          SELECT 
+            DATE(created_at) as date,
+            COUNT(*) as count
+          FROM noticias
+          WHERE created_at BETWEEN $1 AND $2
+          GROUP BY DATE(created_at)
+          ORDER BY date;
+        `,
+        [queryFrom, queryTo]
+      );
+      const data = result.rows.map(row => ({
+        name: row.date, // Formato YYYY-MM-DD
+        value: parseInt(row.count)
+      }));
+      res.json(data);
+    } else {
+      res.status(400).send('Tipo de métrica inválido');
     }
-
-    const result = await pool.query(query, queryParams);
-    const totalMencoes = parseInt(result.rows[0].total_mencoes) || 0;
-    res.json({ total_mencoes: totalMencoes });
   } catch (error) {
     console.error('Erro ao buscar métricas:', error);
     res.status(500).send('Erro no servidor');
