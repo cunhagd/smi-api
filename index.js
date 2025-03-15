@@ -124,47 +124,33 @@ app.get('/portais-relevantes', async (req, res) => {
   }
 });
 
-app.get('/noticias', async (req, res) => {
+app.get('/portais', async (req, res) => {
   try {
-    const { from, to } = req.query;
-
-    let queryFrom = from || new Date(new Date().setDate(new Date().getDate() - 30)).toISOString().split('T')[0];
-    let queryTo = to || new Date().toISOString().split('T')[0];
+    const queryFrom = '2025-03-01';
+    const queryTo = '2025-03-15';
 
     console.log('Intervalo de busca na API:', { queryFrom, queryTo });
 
     const result = await pool.query(
       `
-        SELECT id, created_at AS data, portal, titulo, pontos, abrangencia
+        SELECT DISTINCT portal
         FROM noticias
-        WHERE created_at >= $1 AND created_at <= $2
-        ORDER BY created_at DESC
+        WHERE created_at BETWEEN $1 AND $2
+        ORDER BY portal ASC
       `,
       [queryFrom + ' 00:00:00', queryTo + ' 23:59:59']
     );
 
-    console.log('Registros encontrados na API:', result.rows.length);
-    console.log('Primeiro registro (se houver):', result.rows[0] || 'Nenhum registro');
+    console.log('Registros de portais encontrados na API:', result.rows.length);
+    console.log('Primeiros registros (se houver):', result.rows.slice(0, 5));
 
-    const data = result.rows.map((row, index) => {
-      try {
-        return {
-          id: row.id ? row.id.toString() : '',
-          data: row.data || '',
-          portal: row.portal || '',
-          titulo: row.titulo || '',
-          pontos: row.pontos != null ? row.pontos.toString() : '0',
-          abrangencia: row.abrangencia != null ? row.abrangencia.toString() : '0'
-        };
-      } catch (mapError) {
-        console.error(`Erro ao mapear linha ${index}:`, mapError);
-        return null;
-      }
-    }).filter(row => row !== null);
+    const data = result.rows.map(row => ({
+      portal: row.portal || 'Desconhecido'
+    }));
 
     res.json(data);
   } catch (error) {
-    console.error('Erro ao buscar notícias:', error.message);
+    console.error('Erro ao buscar portais:', error.message);
     console.error('Stack trace:', error.stack);
     res.status(500).json({ error: error.message });
   }
