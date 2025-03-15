@@ -78,7 +78,7 @@ app.get('/pontuacao-total', async (req, res) => {
   }
 });
 
-// Nova rota para portais relevantes
+// Rota para portais relevantes
 app.get('/portais-relevantes', async (req, res) => {
   try {
     const { from, to, type } = req.query;
@@ -93,18 +93,18 @@ app.get('/portais-relevantes', async (req, res) => {
       WHERE created_at BETWEEN $1 AND $2
     `;
     let whereClause = '';
+    let orderByClause = 'ORDER BY total_pontuacao DESC';
 
     if (type === 'positivas') {
       whereClause = ' AND pontos > 0';
     } else if (type === 'negativas') {
-      whereClause = ' AND pontos < 0';
+      orderByClause = 'ORDER BY total_pontuacao ASC'; // Ordenar em ordem crescente para menores pontuações
     }
 
-    query += whereClause + ' GROUP BY portal ORDER BY total_pontuacao DESC';
+    query += whereClause + ' GROUP BY portal ' + orderByClause;
 
     const result = await pool.query(query, [queryFrom, queryTo]);
 
-    // Separar os 5 maiores e 5 menores (considerando apenas os valores extremos)
     const data = result.rows.map(row => ({
       name: row.portal || 'Desconhecido',
       value: parseFloat(row.total_pontuacao)
@@ -115,7 +115,7 @@ app.get('/portais-relevantes', async (req, res) => {
       top5 = data.slice(0, 5); // Top 5 com maior pontuação positiva
       bottom5 = [];
     } else if (type === 'negativas') {
-      bottom5 = data.slice(-5).reverse(); // Top 5 com menor pontuação (mais negativas)
+      bottom5 = data.slice(0, 5); // Top 5 com menor pontuação total (independente de ser negativa)
       top5 = [];
     } else {
       top5 = data.slice(0, 5); // Top 5 com maior pontuação total
