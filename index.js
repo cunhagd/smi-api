@@ -129,7 +129,7 @@ app.get('/portais-relevantes', async (req, res) => {
   }
 });
 
-// Nova rota para buscar notícias
+// Rota para buscar notícias
 app.get('/noticias', async (req, res) => {
   try {
     const { from, to } = req.query;
@@ -140,7 +140,7 @@ app.get('/noticias', async (req, res) => {
 
     const result = await pool.query(
       `
-        SELECT id, created_at AS data, portal AS veiculo, titulo, editoria, autor, sentimento, abrangencia AS alcance
+        SELECT id, created_at AS data, portal, titulo, link, pontos, sentimento, abrangencia
         FROM noticias
         WHERE created_at BETWEEN $1 AND $2
         ORDER BY created_at DESC
@@ -151,12 +151,12 @@ app.get('/noticias', async (req, res) => {
     const data = result.rows.map(row => ({
       id: row.id.toString(),
       data: row.data,
-      veiculo: row.veiculo,
+      portal: row.portal,
       titulo: row.titulo,
-      editoria: row.editoria,
-      autor: row.autor,
+      link: row.link,
+      pontos: row.pontos,
       sentimento: row.sentimento,
-      alcance: row.alcance ? row.alcance.toString() + 'K' : '0K'
+      abrangencia: row.abrangencia ? row.abrangencia.toString() : '0'
     }));
 
     res.json(data);
