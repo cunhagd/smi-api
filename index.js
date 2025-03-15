@@ -15,7 +15,7 @@ const pool = new Pool({
   connectionString: process.env.DATABASE_URL
 });
 
-// Rota para pegar as métricas
+// Rota para pegar o total de menções
 app.get('/metrics', async (req, res) => {
   try {
     const { type, from, to } = req.query;
@@ -44,7 +44,7 @@ app.get('/metrics', async (req, res) => {
         [queryFrom, queryTo]
       );
       const data = result.rows.map(row => ({
-        name: row.date, // Formato YYYY-MM-DD
+        name: row.date,
         value: parseInt(row.count)
       }));
       res.json(data);
@@ -53,6 +53,27 @@ app.get('/metrics', async (req, res) => {
     }
   } catch (error) {
     console.error('Erro ao buscar métricas:', error);
+    res.status(500).send('Erro no servidor');
+  }
+});
+
+// Nova rota para a pontuação total
+app.get('/pontuacao-total', async (req, res) => {
+  try {
+    const { from, to } = req.query;
+
+    // Definir intervalo padrão (últimos 30 dias) se não fornecido
+    let queryFrom = from || new Date(new Date().setDate(new Date().getDate() - 30)).toISOString().split('T')[0];
+    let queryTo = to || new Date().toISOString().split('T')[0];
+
+    const result = await pool.query(
+      'SELECT COALESCE(SUM(pontos), 0) as total_pontuacao FROM noticias WHERE created_at BETWEEN $1 AND $2',
+      [queryFrom, queryTo]
+    );
+    const totalPontuacao = parseFloat(result.rows[0].total_pontuacao) || 0;
+    res.json({ total_pontuacao: totalPontuacao });
+  } catch (error) {
+    console.error('Erro ao buscar pontuação total:', error);
     res.status(500).send('Erro no servidor');
   }
 });
