@@ -156,6 +156,39 @@ app.get('/portais', async (req, res) => {
   }
 });
 
+app.get('/noticias', async (req, res) => {
+  try {
+    const queryFrom = '2025-03-01';
+    const queryTo = '2025-03-15';
+
+    console.log('Intervalo de busca na API:', { queryFrom, queryTo });
+
+    const result = await pool.query(
+      `
+        SELECT created_at AS data, portal
+        FROM noticias
+        WHERE created_at BETWEEN $1 AND $2
+        ORDER BY created_at DESC
+      `,
+      [queryFrom + ' 00:00:00', queryTo + ' 23:59:59']
+    );
+
+    console.log('Registros de notícias encontrados na API:', result.rows.length);
+    console.log('Primeiros registros (se houver):', result.rows.slice(0, 5));
+
+    const data = result.rows.map(row => ({
+      data: row.data || '',
+      portal: row.portal || 'Desconhecido'
+    }));
+
+    res.json(data);
+  } catch (error) {
+    console.error('Erro ao buscar notícias:', error.message);
+    console.error('Stack trace:', error.stack);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 app.listen(port, () => {
   console.log(`API rodando em http://localhost:${port}`);
 });
