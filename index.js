@@ -57,7 +57,7 @@ app.get('/metrics', async (req, res) => {
   }
 });
 
-// Nova rota para a pontuação total
+// Rota para a pontuação total
 app.get('/pontuacao-total', async (req, res) => {
   try {
     const { from, to } = req.query;
@@ -74,6 +74,57 @@ app.get('/pontuacao-total', async (req, res) => {
     res.json({ total_pontuacao: totalPontuacao });
   } catch (error) {
     console.error('Erro ao buscar pontuação total:', error);
+    res.status(500).send('Erro no servidor');
+  }
+});
+
+// Nova rota para portais relevantes
+app.get('/portais-relevantes', async (req, res) => {
+  try {
+    const { from, to, type } = req.query;
+
+    // Definir intervalo padrão (últimos 30 dias) se não fornecido
+    let queryFrom = from || new Date(new Date().setDate(new Date().getDate() - 30)).toISOString().split('T')[0];
+    let queryTo = to || new Date().toISOString().split('T')[0];
+
+    let query = `
+      SELECT portal, COALESCE(SUM(pontos), 0) as total_pontuacao
+      FROM noticias
+      WHERE created_at BETWEEN $1 AND $2
+    `;
+    let whereClause = '';
+
+    if (type === 'positivas') {
+      whereClause = ' AND pontos > 0';
+    } else if (type === 'negativas') {
+      whereClause = ' AND pontos < 0';
+    }
+
+    query += whereClause + ' GROUP BY portal ORDER BY total_pontuacao DESC';
+
+    const result = await pool.query(query, [queryFrom, queryTo]);
+
+    // Separar os 5 maiores e 5 menores (considerando apenas os valores extremos)
+    const data = result.rows.map(row => ({
+      name: row.portal || 'Desconhecido',
+      value: parseFloat(row.total_pontuacao)
+    }));
+
+    let top5, bottom5;
+    if (type === 'positivas') {
+      top5 = data.slice(0, 5); // Top 5 com maior pontuação positiva
+      bottom5 = [];
+    } else if (type === 'negativas') {
+      bottom5 = data.slice(-5).reverse(); // Top 5 com menor pontuação (mais negativas)
+      top5 = [];
+    } else {
+      top5 = data.slice(0, 5); // Top 5 com maior pontuação total
+      bottom5 = data.slice(-5).reverse(); // Top 5 com menor pontuação total
+    }
+
+    res.json({ top5, bottom5 });
+  } catch (error) {
+    console.error('Erro ao buscar portais relevantes:', error);
     res.status(500).send('Erro no servidor');
   }
 });
