@@ -166,7 +166,7 @@ app.get('/noticias', async (req, res) => {
 
     const result = await pool.query(
       `
-        SELECT data, portal, titulo
+        SELECT data, portal, titulo, link
         FROM noticias
         WHERE TO_DATE(data, 'DD/MM/YYYY') BETWEEN TO_DATE($1, 'YYYY-MM-DD') AND TO_DATE($2, 'YYYY-MM-DD')
         ORDER BY TO_DATE(data, 'DD/MM/YYYY') DESC
@@ -180,7 +180,8 @@ app.get('/noticias', async (req, res) => {
     const data = result.rows.map(row => ({
       data: row.data || '',
       portal: row.portal || 'Desconhecido',
-      titulo: row.titulo || 'Título Não Disponível'
+      titulo: row.titulo || 'Título Não Disponível',
+      link: row.link || ''
     }));
 
     res.json(data);
