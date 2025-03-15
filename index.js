@@ -158,8 +158,9 @@ app.get('/portais', async (req, res) => {
 
 app.get('/noticias', async (req, res) => {
   try {
-    const queryFrom = '2025-03-01';
-    const queryTo = '2025-03-15';
+    const { from, to } = req.query;
+    let queryFrom = from || '2025-03-01';
+    let queryTo = to || '2025-03-15';
 
     console.log('Intervalo de busca na API:', { queryFrom, queryTo });
 
@@ -167,10 +168,10 @@ app.get('/noticias', async (req, res) => {
       `
         SELECT data, portal
         FROM noticias
-        WHERE created_at BETWEEN $1::timestamp AND $2::timestamp
-        ORDER BY created_at DESC
+        WHERE TO_DATE(data, 'DD/MM/YYYY') BETWEEN TO_DATE($1, 'YYYY-MM-DD') AND TO_DATE($2, 'YYYY-MM-DD')
+        ORDER BY TO_DATE(data, 'DD/MM/YYYY') DESC
       `,
-      [queryFrom + ' 00:00:00', queryTo + ' 23:59:59']
+      [queryFrom, queryTo]
     );
 
     console.log('Registros de notícias encontrados na API:', result.rows.length);
