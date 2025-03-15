@@ -135,7 +135,7 @@ app.get('/portais', async (req, res) => {
       `
         SELECT DISTINCT portal
         FROM noticias
-        WHERE created_at BETWEEN $1 AND $2
+        WHERE created_at BETWEEN $1::timestamp AND $2::timestamp
         ORDER BY portal ASC
       `,
       [queryFrom + ' 00:00:00', queryTo + ' 23:59:59']
@@ -167,7 +167,7 @@ app.get('/noticias', async (req, res) => {
       `
         SELECT created_at AS data, portal
         FROM noticias
-        WHERE created_at BETWEEN $1 AND $2
+        WHERE created_at BETWEEN $1::timestamp AND $2::timestamp
         ORDER BY created_at DESC
       `,
       [queryFrom + ' 00:00:00', queryTo + ' 23:59:59']
