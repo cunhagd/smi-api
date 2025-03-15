@@ -177,7 +177,7 @@ app.get('/noticias', async (req, res) => {
     console.log('Primeiros registros (se houver):', result.rows.slice(0, 5));
 
     const data = result.rows.map(row => ({
-      data: row.data || '',
+      data: row.data ? new Date(row.data).toISOString() : '',
       portal: row.portal || 'Desconhecido'
     }));
 
