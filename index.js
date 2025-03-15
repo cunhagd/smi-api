@@ -165,7 +165,7 @@ app.get('/noticias', async (req, res) => {
 
     const result = await pool.query(
       `
-        SELECT created_at AS data, portal
+        SELECT data, portal
         FROM noticias
         WHERE created_at BETWEEN $1::timestamp AND $2::timestamp
         ORDER BY created_at DESC
@@ -177,7 +177,7 @@ app.get('/noticias', async (req, res) => {
     console.log('Primeiros registros (se houver):', result.rows.slice(0, 5));
 
     const data = result.rows.map(row => ({
-      data: row.data ? new Date(row.data).toISOString() : '',
+      data: row.data || '',
       portal: row.portal || 'Desconhecido'
     }));
 
