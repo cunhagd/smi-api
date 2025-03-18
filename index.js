@@ -46,7 +46,7 @@ app.get('/noticias', async (req, res) => {
       titulo: row.titulo || 'Título Não Disponível',
       link: row.link || '',
       pontos: row.pontos || 0,
-      id: row.id // Incluindo o ID da notícia
+      id: row.id
     }));
 
     res.json(data);
@@ -57,7 +57,6 @@ app.get('/noticias', async (req, res) => {
   }
 });
 
-// Nova rota PUT para atualizar o tema
 app.put('/noticias/:id', async (req, res) => {
   const { id } = req.params;
   const { tema } = req.body;
@@ -85,6 +84,69 @@ app.put('/noticias/:id', async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 });
+
+// Nova rota para buscar os pontos das notícias
+app.get('/noticias/pontos', async (req, res) => {
+  try {
+    const result = await pool.query(
+      `
+        SELECT id, titulo, pontos
+        FROM noticias
+        ORDER BY id ASC
+      `
+    );
+
+    console.log('Registros de pontos encontrados:', result.rows.length);
+    console.log('Primeiros registros (se houver):', result.rows.slice(0, 5));
+
+    const data = result.rows.map(row => ({
+      id: row.id,
+      titulo: row.titulo || 'Título Não Disponível',
+      pontos: row.pontos || 0
+    }));
+
+    res.json(data);
+  } catch (error) {
+    console.error('Erro ao buscar pontos das notícias:', error.message);
+    console.error('Stack trace:', error.stack);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// (Opcional) Rota para buscar pontos de uma notícia específica por ID
+/*
+app.get('/noticias/:id/pontos', async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    const result = await pool.query(
+      `
+        SELECT id, titulo, pontos
+        FROM noticias
+        WHERE id = $1
+      `,
+      [id]
+    );
+
+    if (result.rowCount === 0) {
+      return res.status(404).json({ error: 'Notícia não encontrada' });
+    }
+
+    const data = {
+      id: result.rows[0].id,
+      titulo: result.rows[0].titulo || 'Título Não Disponível',
+      pontos: result.rows[0].pontos || 0
+    };
+
+    console.log('Pontos da notícia encontrados:', data);
+    res.json(data);
+  } catch (error) {
+    console.error('Erro ao buscar pontos da notícia:', error.message);
+    console.error('Stack trace:', error.stack);
+    res.status(500).json({ error: error.message });
+  }
+});
+*/
 
 app.listen(port, () => {
   console.log(`API rodando em http://localhost:${port}`);
