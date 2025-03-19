@@ -43,7 +43,7 @@ app.get('/noticias', async (req, res) => {
     const data = result.rows.map(row => ({
       data: row.data || '',
       portal: row.portal || 'Desconhecido',
-      titulo: row.titulo || 'Título Não Disponível',
+      titulo: row.titulo || 'Título Não Disponível!',
       link: row.link || '',
       pontos: row.pontos || 0,
       id: row.id
