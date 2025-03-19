@@ -96,7 +96,7 @@ app.get('/noticias/pontos', async (req, res) => {
       `
     );
 
-    console.log('Registros de pontos encontrados:', result.rows.length);
+    console.log('Registro de pontos encontrados:', result.rows.length);
     console.log('Primeiros registros (se houver):', result.rows.slice(0, 5));
 
     const data = result.rows.map(row => ({
