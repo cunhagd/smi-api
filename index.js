@@ -76,7 +76,7 @@ app.put('/noticias/:id', async (req, res) => {
       return res.status(404).json({ error: 'Notícia não encontrada' });
     }
 
-    console.log('Tema atualizado com sucesso:', result.rows[0]);
+    console.log('Tema atualizado:', result.rows[0]);
     res.json(result.rows[0]);
   } catch (error) {
     console.error('Erro ao atualizar o tema:', error.message);
