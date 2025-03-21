@@ -15,8 +15,57 @@ const pool = new Pool({
 });
 
 // Rotas existentes (mantidas como estão)
-app.get('/metrics', async (req, res) => { /* ... */ });
-app.get('/pontuacao-total', async (req, res) => { /* ... */ });
+app.get('/metrics', async (req, res) => {
+  const { type, from, to } = req.query;
+  try {
+    if (type === 'total-mencoes') { // Manter por compatibilidade, ajustar depois
+      const result = await pool.query(
+        `
+          SELECT COUNT(*) as total_noticias
+          FROM noticias
+          WHERE TO_DATE(data, 'DD/MM/YYYY') BETWEEN TO_DATE($1, 'YYYY-MM-DD') AND TO_DATE($2, 'YYYY-MM-DD')
+        `,
+        [from, to]
+      );
+      res.json({ total_noticias: parseInt(result.rows[0].total_noticias) });
+    } else if (type === 'noticias-por-periodo') {
+      const result = await pool.query(
+        `
+          SELECT data, COUNT(*) as value
+          FROM noticias
+          WHERE TO_DATE(data, 'DD/MM/YYYY') BETWEEN TO_DATE($1, 'YYYY-MM-DD') AND TO_DATE($2, 'YYYY-MM-DD')
+          GROUP BY data
+          ORDER BY TO_DATE(data, 'DD/MM/YYYY') ASC
+        `,
+        [from, to]
+      );
+      res.json(result.rows.map(row => ({ name: row.data, value: parseInt(row.value) })));
+    } else {
+      res.status(400).json({ error: 'Tipo de métrica inválido' });
+    }
+  } catch (error) {
+    console.error('Erro ao buscar métricas:', error.message);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.get('/pontuacao-total', async (req, res) => {
+  const { from, to } = req.query;
+  try {
+    const result = await pool.query(
+      `
+        SELECT SUM(pontos) as total_pontuacao
+        FROM noticias
+        WHERE TO_DATE(data, 'DD/MM/YYYY') BETWEEN TO_DATE($1, 'YYYY-MM-DD') AND TO_DATE($2, 'YYYY-MM-DD')
+      `,
+      [from, to]
+    );
+    res.json({ total_pontuacao: parseInt(result.rows[0].total_pontuacao) || 0 });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 app.get('/portais-relevantes', async (req, res) => { /* ... */ });
 app.get('/portais', async (req, res) => { /* ... */ });
 
