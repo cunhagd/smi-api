@@ -18,7 +18,7 @@ const pool = new Pool({
 app.get('/metrics', async (req, res) => {
   const { type, from, to } = req.query;
   try {
-    if (type === 'total-mencoes') { // Manter por compatibilidade, ajustar depois
+    if (type === 'total-noticias') { // Manter por compatibilidade, ajustar depois
       const result = await pool.query(
         `
           SELECT COUNT(*) as total_noticias
