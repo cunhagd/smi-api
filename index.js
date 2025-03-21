@@ -19,11 +19,12 @@ app.get('/metrics', async (req, res) => { /* ... */ });
 app.get('/pontuacao-total', async (req, res) => { /* ... */ });
 app.get('/portais-relevantes', async (req, res) => { /* ... */ });
 app.get('/portais', async (req, res) => { /* ... */ });
+
 app.get('/noticias', async (req, res) => {
   try {
     const { from, to } = req.query;
-    let queryFrom = from || '2025-03-01';
-    let queryTo = to || '2025-03-15';
+    let queryFrom = from || '2025-03-01'; // Data inicial fixa ou ajustar conforme necessidade
+    let queryTo = to || new Date().toISOString().split('T')[0]; // Data atual (ex.: 2025-03-21)
 
     console.log('Intervalo de busca na API:', { queryFrom, queryTo });
 
