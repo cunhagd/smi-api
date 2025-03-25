@@ -3,17 +3,39 @@ const sql = require('mssql');
 const app = express();
 const port = process.env.PORT || 3000;
 
+// Função para parsear a string de conexão ODBC
+function parseConnectionString(connectionString) {
+  const config = {};
+  const parts = connectionString.split(';');
+  parts.forEach(part => {
+    const [key, value] = part.split('=');
+    if (key && value) {
+      config[key.toLowerCase()] = value;
+    }
+  });
+  return {
+    user: config.uid,
+    password: config.pwd,
+    server: config.server.replace('tcp:', ''), // Remove o prefixo "tcp:"
+    database: config.database,
+    port: parseInt(config.server.split(',')[1] || 1433), // Extrai a porta (ex.: 1433)
+    options: {
+      encrypt: config.encrypt === 'yes',
+      trustServerCertificate: config.trustservercertificate === 'no' ? false : true
+    }
+  };
+}
+
+// Configuração da conexão com o Azure SQL Database
+const connectionString = process.env.DATABASE_URL;
+const dbConfig = parseConnectionString(connectionString);
+
 app.use(express.json()); // Para processar requisições com corpo JSON
 app.use((req, res, next) => {
   res.header('Access-Control-Allow-Origin', '*');
   res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
   next();
 });
-
-// Configuração da conexão com o Azure SQL Database
-const dbConfig = {
-  connectionString: process.env.DATABASE_URL
-};
 
 // Rotas existentes
 app.get('/metrics', async (req, res) => {
