@@ -28,27 +28,25 @@ app.use((req, res, next) => {
 // Rotas existentes
 app.get('/metrics', async (req, res) => {
   const { type, from, to } = req.query;
-  let client;
   try {
-    client = await pool.connect();
-    if (type === 'total-noticias') {
-      const result = await client.query(
+    if (type === 'total-mencoes') { // Manter por compatibilidade, ajustar depois
+      const result = await pool.query(
         `
-        SELECT COUNT(*) as total_noticias
-        FROM noticias
-        WHERE data::date BETWEEN $1 AND $2
+          SELECT COUNT(*) as total_noticias
+          FROM noticias
+          WHERE TO_DATE(data, 'DD/MM/YYYY') BETWEEN TO_DATE($1, 'YYYY-MM-DD') AND TO_DATE($2, 'YYYY-MM-DD')
         `,
         [from, to]
       );
       res.json({ total_noticias: parseInt(result.rows[0].total_noticias) });
     } else if (type === 'noticias-por-periodo') {
-      const result = await client.query(
+      const result = await pool.query(
         `
-        SELECT data, COUNT(*) as value
-        FROM noticias
-        WHERE data::date BETWEEN $1 AND $2
-        GROUP BY data
-        ORDER BY data::date ASC
+          SELECT data, COUNT(*) as value
+          FROM noticias
+          WHERE TO_DATE(data, 'DD/MM/YYYY') BETWEEN TO_DATE($1, 'YYYY-MM-DD') AND TO_DATE($2, 'YYYY-MM-DD')
+          GROUP BY data
+          ORDER BY TO_DATE(data, 'DD/MM/YYYY') ASC
         `,
         [from, to]
       );
@@ -59,30 +57,23 @@ app.get('/metrics', async (req, res) => {
   } catch (error) {
     console.error('Erro ao buscar métricas:', error.message);
     res.status(500).json({ error: error.message });
-  } finally {
-    if (client) client.release();
   }
 });
 
 app.get('/pontuacao-total', async (req, res) => {
   const { from, to } = req.query;
-  let client;
   try {
-    client = await pool.connect();
-    const result = await client.query(
+    const result = await pool.query(
       `
-      SELECT SUM(pontos) as total_pontuacao
-      FROM noticias
-      WHERE data::date BETWEEN $1 AND $2
+        SELECT SUM(pontos) as total_pontuacao
+        FROM noticias
+        WHERE TO_DATE(data, 'DD/MM/YYYY') BETWEEN TO_DATE($1, 'YYYY-MM-DD') AND TO_DATE($2, 'YYYY-MM-DD')
       `,
       [from, to]
     );
     res.json({ total_pontuacao: parseInt(result.rows[0].total_pontuacao) || 0 });
   } catch (error) {
-    console.error('Erro ao buscar pontuação total:', error.message);
     res.status(500).json({ error: error.message });
-  } finally {
-    if (client) client.release();
   }
 });
 
@@ -93,8 +84,8 @@ app.get('/noticias', async (req, res) => {
   let client;
   try {
     const { from, to } = req.query;
-    let queryFrom = from || '2025-03-01';
-    let queryTo = to || new Date().toISOString().split('T')[0];
+    let queryFrom = from || '2025-03-01'; // Data inicial padrão
+    let queryTo = to || new Date().toISOString().split('T')[0]; // Data atual
 
     console.log('Intervalo de busca na API:', { queryFrom, queryTo });
 
@@ -103,8 +94,8 @@ app.get('/noticias', async (req, res) => {
       `
       SELECT data, portal, titulo, link, pontos, id
       FROM noticias
-      WHERE data::date BETWEEN $1 AND $2
-      ORDER BY data::date DESC
+      WHERE TO_DATE(data, 'DD/MM/YYYY') BETWEEN TO_DATE($1, 'YYYY-MM-DD') AND TO_DATE($2, 'YYYY-MM-DD')
+      ORDER BY TO_DATE(data, 'DD/MM/YYYY') DESC
       `,
       [queryFrom, queryTo]
     );
@@ -113,7 +104,7 @@ app.get('/noticias', async (req, res) => {
     console.log('Primeiros registros (se houver):', result.rows.slice(0, 5));
 
     const data = result.rows.map(row => ({
-      data: row.data || '',
+      data: row.data || '', // A data já é uma string no formato DD/MM/YYYY
       portal: row.portal || 'Desconhecido',
       titulo: row.titulo || 'Título Não Disponível!',
       link: row.link || '',
@@ -134,15 +125,14 @@ app.get('/noticias', async (req, res) => {
 app.put('/noticias/:id', async (req, res) => {
   const { id } = req.params;
   const { tema } = req.body;
-  let client;
+
   try {
-    client = await pool.connect();
-    const result = await client.query(
+    const result = await pool.query(
       `
-      UPDATE noticias
-      SET tema = $1
-      WHERE id = $2
-      RETURNING *
+        UPDATE noticias
+        SET tema = $1
+        WHERE id = $2
+        RETURNING *
       `,
       [tema, id]
     );
@@ -151,26 +141,23 @@ app.put('/noticias/:id', async (req, res) => {
       return res.status(404).json({ error: 'Notícia não encontrada' });
     }
 
-    console.log('Tema atualizado com sucesso:', { id, tema });
-    res.json({ id, tema });
+    console.log('Tema atualizado:', result.rows[0]);
+    res.json(result.rows[0]);
   } catch (error) {
     console.error('Erro ao atualizar o tema:', error.message);
     console.error('Stack trace:', error.stack);
     res.status(500).json({ error: error.message });
-  } finally {
-    if (client) client.release();
   }
 });
 
+// Nova rota para buscar os pontos das notícias
 app.get('/noticias/pontos', async (req, res) => {
-  let client;
   try {
-    client = await pool.connect();
-    const result = await client.query(
+    const result = await pool.query(
       `
-      SELECT id, titulo, pontos
-      FROM noticias
-      ORDER BY id ASC
+        SELECT id, titulo, pontos
+        FROM noticias
+        ORDER BY id ASC
       `
     );
 
@@ -188,10 +175,43 @@ app.get('/noticias/pontos', async (req, res) => {
     console.error('Erro ao buscar pontos das notícias:', error.message);
     console.error('Stack trace:', error.stack);
     res.status(500).json({ error: error.message });
-  } finally {
-    if (client) client.release();
   }
 });
+
+// (Opcional) Rota para buscar pontos de uma notícia específica por ID
+ /*
+ app.get('/noticias/:id/pontos', async (req, res) => {
+   const { id } = req.params;
+ 
+   try {
+     const result = await pool.query(
+       `
+         SELECT id, titulo, pontos
+         FROM noticias
+         WHERE id = $1
+       `,
+       [id]
+     );
+ 
+     if (result.rowCount === 0) {
+       return res.status(404).json({ error: 'Notícia não encontrada' });
+     }
+ 
+     const data = {
+       id: result.rows[0].id,
+       titulo: result.rows[0].titulo || 'Título Não Disponível',
+       pontos: result.rows[0].pontos || 0
+     };
+ 
+     console.log('Pontos da notícia encontrados:', data);
+     res.json(data);
+   } catch (error) {
+     console.error('Erro ao buscar pontos da notícia:', error.message);
+     console.error('Stack trace:', error.stack);
+     res.status(500).json({ error: error.message });
+   }
+ });
+ */
 
 app.listen(port, () => {
   console.log(`API rodando em http://localhost:${port}`);
