@@ -1,35 +1,24 @@
 const express = require('express');
-const { Pool } = require('pg');
-const app = express();
-const port = process.env.PORT || 3000;
-
-const databaseUrl = process.env.DATABASE_URL;
-const pool = new Pool({
-  connectionString: databaseUrl,
-  ssl: { rejectUnauthorized: false }
-});
-
-// Teste de conexão ao iniciar o servidor
-pool.connect((err, client, release) => {
-  if (err) {
-    return console.error('Erro ao conectar ao PostgreSQL:', err.stack);
-  }
-  console.log('Conectado ao PostgreSQL com sucesso!');
-  release();
-});
-
-app.use(express.json()); 
-app.use((req, res, next) => {
-  res.header('Access-Control-Allow-Origin', '*');
-  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
-  next();
-});
+ const { Pool } = require('pg');
+ const app = express();
+ const port = process.env.PORT || 3000;
+ 
+ app.use(express.json()); // Para processar requisições com corpo JSON
+ app.use((req, res, next) => {
+   res.header('Access-Control-Allow-Origin', '*');
+   res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
+   next();
+ });
+ 
+ const pool = new Pool({
+   connectionString: process.env.DATABASE_URL
+ });
 
 // Rotas existentes
 app.get('/metrics', async (req, res) => {
   const { type, from, to } = req.query;
   try {
-    if (type === 'total-mencoes') { // Manter por compatibilidade, ajustar depois
+    if (type === 'total-noticias') { // Manter por compatibilidade, ajustar depois
       const result = await pool.query(
         `
           SELECT COUNT(*) as total_noticias
