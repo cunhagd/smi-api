@@ -1,34 +1,23 @@
 const express = require('express');
-const sql = require('mssql');
+const sql = require('pg');
 const app = express();
 const port = process.env.PORT || 3000;
 
-// Função para parsear a string de conexão ODBC
-function parseConnectionString(connectionString) {
-  const config = {};
-  const parts = connectionString.split(';');
-  parts.forEach(part => {
-    const [key, value] = part.split('=');
-    if (key && value) {
-      config[key.toLowerCase()] = value;
-    }
-  });
-  return {
-    user: config.uid,
-    password: config.pwd,
-    server: config.server.replace('tcp:', ''), // Remove o prefixo "tcp:"
-    database: config.database,
-    port: parseInt(config.server.split(',')[1] || 1433), // Extrai a porta (ex.: 1433)
-    options: {
-      encrypt: config.encrypt === 'yes',
-      trustServerCertificate: config.trustservercertificate === 'no' ? false : true
-    }
-  };
-}
+// Configuração da conexão com o PostgreSQL
+const databaseUrl = process.env.DATABASE_URL;
+const pool = new Pool({
+  connectionString: databaseUrl,
+  ssl: { rejectUnauthorized: false } // Necessário para conexões no Railway
+});
 
-// Configuração da conexão com o Azure SQL Database
-const connectionString = process.env.DATABASE_URL;
-const dbConfig = parseConnectionString(connectionString);
+// Teste de conexão ao iniciar o servidor
+pool.connect((err, client, release) => {
+  if (err) {
+    return console.error('Erro ao conectar ao PostgreSQL:', err.stack);
+  }
+  console.log('Conectado ao PostgreSQL com sucesso!');
+  release();
+});
 
 app.use(express.json()); // Para processar requisições com corpo JSON
 app.use((req, res, next) => {
