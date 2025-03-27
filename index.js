@@ -1,5 +1,5 @@
 const express = require('express');
-const sql = require('pg');
+const { Pool } = require('pg'); // Certifique-se de que esta linha está presente e correta
 const app = express();
 const port = process.env.PORT || 3000;
 
@@ -7,7 +7,7 @@ const port = process.env.PORT || 3000;
 const databaseUrl = process.env.DATABASE_URL;
 const pool = new Pool({
   connectionString: databaseUrl,
-  ssl: { rejectUnauthorized: false } // Necessário para conexões no Railway
+  ssl: { rejectUnauthorized: false }
 });
 
 // Teste de conexão ao iniciar o servidor
