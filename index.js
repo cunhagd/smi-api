@@ -1,9 +1,8 @@
 const express = require('express');
-const { Pool } = require('pg'); // Certifique-se de que esta linha está presente e correta
+const { Pool } = require('pg');
 const app = express();
 const port = process.env.PORT || 3000;
 
-// Configuração da conexão com o PostgreSQL
 const databaseUrl = process.env.DATABASE_URL;
 const pool = new Pool({
   connectionString: databaseUrl,
@@ -19,7 +18,7 @@ pool.connect((err, client, release) => {
   release();
 });
 
-app.use(express.json()); // Para processar requisições com corpo JSON
+app.use(express.json()); 
 app.use((req, res, next) => {
   res.header('Access-Control-Allow-Origin', '*');
   res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
@@ -29,31 +28,31 @@ app.use((req, res, next) => {
 // Rotas existentes
 app.get('/metrics', async (req, res) => {
   const { type, from, to } = req.query;
-  let pool;
+  let client;
   try {
-    pool = await sql.connect(dbConfig);
+    client = await pool.connect();
     if (type === 'total-noticias') {
-      const result = await pool.request()
-        .input('from', sql.Date, from)
-        .input('to', sql.Date, to)
-        .query(`
-          SELECT COUNT(*) as total_noticias
-          FROM noticias
-          WHERE CAST(data AS DATE) BETWEEN @from AND @to
-        `);
-      res.json({ total_noticias: parseInt(result.recordset[0].total_noticias) });
+      const result = await client.query(
+        `
+        SELECT COUNT(*) as total_noticias
+        FROM noticias
+        WHERE data::date BETWEEN $1 AND $2
+        `,
+        [from, to]
+      );
+      res.json({ total_noticias: parseInt(result.rows[0].total_noticias) });
     } else if (type === 'noticias-por-periodo') {
-      const result = await pool.request()
-        .input('from', sql.Date, from)
-        .input('to', sql.Date, to)
-        .query(`
-          SELECT data, COUNT(*) as value
-          FROM noticias
-          WHERE CAST(data AS DATE) BETWEEN @from AND @to
-          GROUP BY data
-          ORDER BY CAST(data AS DATE) ASC
-        `);
-      res.json(result.recordset.map(row => ({ name: row.data, value: parseInt(row.value) })));
+      const result = await client.query(
+        `
+        SELECT data, COUNT(*) as value
+        FROM noticias
+        WHERE data::date BETWEEN $1 AND $2
+        GROUP BY data
+        ORDER BY data::date ASC
+        `,
+        [from, to]
+      );
+      res.json(result.rows.map(row => ({ name: row.data, value: parseInt(row.value) })));
     } else {
       res.status(400).json({ error: 'Tipo de métrica inválido' });
     }
@@ -61,28 +60,29 @@ app.get('/metrics', async (req, res) => {
     console.error('Erro ao buscar métricas:', error.message);
     res.status(500).json({ error: error.message });
   } finally {
-    if (pool) pool.close();
+    if (client) client.release();
   }
 });
 
 app.get('/pontuacao-total', async (req, res) => {
   const { from, to } = req.query;
-  let pool;
+  let client;
   try {
-    pool = await sql.connect(dbConfig);
-    const result = await pool.request()
-      .input('from', sql.Date, from)
-      .input('to', sql.Date, to)
-      .query(`
-        SELECT SUM(pontos) as total_pontuacao
-        FROM noticias
-        WHERE CAST(data AS DATE) BETWEEN @from AND @to
-      `);
-    res.json({ total_pontuacao: parseInt(result.recordset[0].total_pontuacao) || 0 });
+    client = await pool.connect();
+    const result = await client.query(
+      `
+      SELECT SUM(pontos) as total_pontuacao
+      FROM noticias
+      WHERE data::date BETWEEN $1 AND $2
+      `,
+      [from, to]
+    );
+    res.json({ total_pontuacao: parseInt(result.rows[0].total_pontuacao) || 0 });
   } catch (error) {
+    console.error('Erro ao buscar pontuação total:', error.message);
     res.status(500).json({ error: error.message });
   } finally {
-    if (pool) pool.close();
+    if (client) client.release();
   }
 });
 
@@ -90,7 +90,7 @@ app.get('/portais-relevantes', async (req, res) => { /* ... */ });
 app.get('/portais', async (req, res) => { /* ... */ });
 
 app.get('/noticias', async (req, res) => {
-  let pool;
+  let client;
   try {
     const { from, to } = req.query;
     let queryFrom = from || '2025-03-01';
@@ -98,21 +98,21 @@ app.get('/noticias', async (req, res) => {
 
     console.log('Intervalo de busca na API:', { queryFrom, queryTo });
 
-    pool = await sql.connect(dbConfig);
-    const result = await pool.request()
-      .input('queryFrom', sql.Date, queryFrom)
-      .input('queryTo', sql.Date, queryTo)
-      .query(`
-        SELECT data, portal, titulo, link, pontos, id
-        FROM noticias
-        WHERE CAST(data AS DATE) BETWEEN @queryFrom AND @queryTo
-        ORDER BY CAST(data AS DATE) DESC
-      `);
+    client = await pool.connect();
+    const result = await client.query(
+      `
+      SELECT data, portal, titulo, link, pontos, id
+      FROM noticias
+      WHERE data::date BETWEEN $1 AND $2
+      ORDER BY data::date DESC
+      `,
+      [queryFrom, queryTo]
+    );
 
-    console.log('Registros de notícias encontrados na API:', result.recordset.length);
-    console.log('Primeiros registros (se houver):', result.recordset.slice(0, 5));
+    console.log('Registros de notícias encontrados na API:', result.rows.length);
+    console.log('Primeiros registros (se houver):', result.rows.slice(0, 5));
 
-    const data = result.recordset.map(row => ({
+    const data = result.rows.map(row => ({
       data: row.data || '',
       portal: row.portal || 'Desconhecido',
       titulo: row.titulo || 'Título Não Disponível!',
@@ -127,26 +127,27 @@ app.get('/noticias', async (req, res) => {
     console.error('Stack trace:', error.stack);
     res.status(500).json({ error: error.message });
   } finally {
-    if (pool) pool.close();
+    if (client) client.release();
   }
 });
 
 app.put('/noticias/:id', async (req, res) => {
   const { id } = req.params;
   const { tema } = req.body;
-  let pool;
+  let client;
   try {
-    pool = await sql.connect(dbConfig);
-    const result = await pool.request()
-      .input('tema', sql.NVarChar, tema)
-      .input('id', sql.Int, id)
-      .query(`
-        UPDATE noticias
-        SET tema = @tema
-        WHERE id = @id
-      `);
+    client = await pool.connect();
+    const result = await client.query(
+      `
+      UPDATE noticias
+      SET tema = $1
+      WHERE id = $2
+      RETURNING *
+      `,
+      [tema, id]
+    );
 
-    if (result.rowsAffected[0] === 0) {
+    if (result.rowCount === 0) {
       return res.status(404).json({ error: 'Notícia não encontrada' });
     }
 
@@ -157,25 +158,26 @@ app.put('/noticias/:id', async (req, res) => {
     console.error('Stack trace:', error.stack);
     res.status(500).json({ error: error.message });
   } finally {
-    if (pool) pool.close();
+    if (client) client.release();
   }
 });
 
 app.get('/noticias/pontos', async (req, res) => {
-  let pool;
+  let client;
   try {
-    pool = await sql.connect(dbConfig);
-    const result = await pool.request()
-      .query(`
-        SELECT id, titulo, pontos
-        FROM noticias
-        ORDER BY id ASC
-      `);
+    client = await pool.connect();
+    const result = await client.query(
+      `
+      SELECT id, titulo, pontos
+      FROM noticias
+      ORDER BY id ASC
+      `
+    );
 
-    console.log('Registro de pontos encontrados:', result.recordset.length);
-    console.log('Primeiros registros (se houver):', result.recordset.slice(0, 5));
+    console.log('Registro de pontos encontrados:', result.rows.length);
+    console.log('Primeiros registros (se houver):', result.rows.slice(0, 5));
 
-    const data = result.recordset.map(row => ({
+    const data = result.rows.map(row => ({
       id: row.id,
       titulo: row.titulo || 'Título Não Disponível',
       pontos: row.pontos || 0
@@ -187,7 +189,7 @@ app.get('/noticias/pontos', async (req, res) => {
     console.error('Stack trace:', error.stack);
     res.status(500).json({ error: error.message });
   } finally {
-    if (pool) pool.close();
+    if (client) client.release();
   }
 });
 
