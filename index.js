@@ -113,27 +113,71 @@ app.get('/noticias', async (req, res) => {
 
 app.put('/noticias/:id', async (req, res) => {
   const { id } = req.params;
-  const { tema } = req.body;
+  const { tema, avaliacao } = req.body;
 
   try {
-    const result = await pool.query(
-      `
-        UPDATE noticias
-        SET tema = $1
-        WHERE id = $2
-        RETURNING *
-      `,
-      [tema, id]
+    // Verificar se pelo menos um campo foi fornecido
+    if (!tema && !avaliacao) {
+      return res.status(400).json({ error: 'Nenhum campo fornecido para atualização. Forneça "tema" ou "avaliacao".' });
+    }
+
+    // Buscar a notícia atual para obter os pontos brutos
+    const currentNoticia = await pool.query(
+      'SELECT pontos FROM noticias WHERE id = $1',
+      [id]
     );
+
+    if (currentNoticia.rowCount === 0) {
+      return res.status(404).json({ error: 'Notícia não encontrada' });
+    }
+
+    // Calcular os novos pontos com base na avaliação
+    let pontos = currentNoticia.rows[0].pontos || 0;
+    const pontosBrutos = Math.abs(pontos);
+    if (avaliacao) {
+      pontos = avaliacao === 'Negativa' ? -pontosBrutos : pontosBrutos;
+    }
+
+    // Construir a query dinamicamente com base nos campos fornecidos
+    const updates = [];
+    const values = [];
+    let paramIndex = 1;
+
+    if (tema) {
+      updates.push(`tema = $${paramIndex}`);
+      values.push(tema);
+      paramIndex++;
+    }
+
+    if (avaliacao) {
+      updates.push(`avaliacao = $${paramIndex}`);
+      values.push(avaliacao);
+      paramIndex++;
+      // Atualizar os pontos com base na nova avaliação
+      updates.push(`pontos = $${paramIndex}`);
+      values.push(pontos);
+      paramIndex++;
+    }
+
+    values.push(id);
+
+    const query = `
+      UPDATE noticias
+      SET ${updates.join(', ')}
+      WHERE id = $${paramIndex}
+      RETURNING *
+    `;
+
+    const result = await pool.query(query, values);
 
     if (result.rowCount === 0) {
       return res.status(404).json({ error: 'Notícia não encontrada' });
     }
 
-    console.log('Tema atualizado:', result.rows[0]);
+    console.log('Notícia atualizada:', result.rows[0]);
     res.json(result.rows[0]);
   } catch (error) {
-    console.error('Erro ao atualizar o tema:', error.message);
+    console.error('Erro ao atualizar a notícia:', error.message);
     console.error('Stack trace:', error.stack);
     res.status(500).json({ error: error.message });
   }
