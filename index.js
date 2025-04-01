@@ -81,7 +81,7 @@ app.get('/noticias', async (req, res) => {
     client = await pool.connect();
     const result = await client.query(
       `
-      SELECT data, portal, titulo, link, pontos, id
+      SELECT data, portal, titulo, link, pontos, id, tema, avaliacao
       FROM noticias
       WHERE TO_DATE(data, 'DD/MM/YYYY') BETWEEN TO_DATE($1, 'YYYY-MM-DD') AND TO_DATE($2, 'YYYY-MM-DD')
       ORDER BY TO_DATE(data, 'DD/MM/YYYY') DESC
@@ -98,7 +98,9 @@ app.get('/noticias', async (req, res) => {
       titulo: row.titulo || 'Título Não Disponível!',
       link: row.link || '',
       pontos: row.pontos || 0,
-      id: row.id
+      id: row.id,
+      tema: row.tema || '', 
+      avaliacao: row.avaliacao || '' 
     }));
 
     res.json(data);
