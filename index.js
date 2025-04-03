@@ -118,15 +118,13 @@ app.get('/noticias', async (req, res) => {
 
 app.put('/noticias/:id', async (req, res) => {
   const { id } = req.params;
-  const { tema, avaliacao } = req.body;
+  let { tema, avaliacao } = req.body;
 
   try {
-    // Verificar se pelo menos um campo foi fornecido
     if (tema === undefined && avaliacao === undefined) {
       return res.status(400).json({ error: 'Nenhum campo fornecido para atualização. Forneça "tema" ou "avaliacao".' });
     }
 
-    // Buscar a notícia atual para obter os pontos brutos
     const currentNoticia = await pool.query(
       'SELECT pontos FROM noticias WHERE id = $1',
       [id]
@@ -136,32 +134,36 @@ app.put('/noticias/:id', async (req, res) => {
       return res.status(404).json({ error: 'Notícia não encontrada' });
     }
 
-    // Calcular os novos pontos com base na avaliação
     let pontos = currentNoticia.rows[0].pontos || 0;
     const pontosBrutos = Math.abs(pontos);
-    if (avaliacao) {
+
+    if (avaliacao !== undefined) {
       pontos = avaliacao === 'Negativa' ? -pontosBrutos : pontosBrutos;
     }
 
-    // Construir a query dinamicamente com base nos campos fornecidos
+    // Construção dinâmica da query
     const updates = [];
     const values = [];
     let paramIndex = 1;
 
-    if (tema) {
+    if (tema !== undefined) {
       updates.push(`tema = $${paramIndex}`);
       values.push(tema);
       paramIndex++;
     }
 
-    if (avaliacao) {
+    if (avaliacao !== undefined) {
       updates.push(`avaliacao = $${paramIndex}`);
       values.push(avaliacao);
       paramIndex++;
-      // Atualizar os pontos com base na nova avaliação
+
       updates.push(`pontos = $${paramIndex}`);
       values.push(pontos);
       paramIndex++;
+    }
+
+    if (updates.length === 0) {
+      return res.status(400).json({ error: 'Nenhum campo válido fornecido para atualização.' });
     }
 
     values.push(id);
