@@ -122,7 +122,7 @@ app.put('/noticias/:id', async (req, res) => {
 
   try {
     // Verificar se pelo menos um campo foi fornecido
-    if (!tema && !avaliacao) {
+    if (tema === undefined && avaliacao === undefined) {
       return res.status(400).json({ error: 'Nenhum campo fornecido para atualização. Forneça "tema" ou "avaliacao".' });
     }
 
