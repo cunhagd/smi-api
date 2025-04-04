@@ -1,27 +1,30 @@
-const express = require('express');
- const { Pool } = require('pg');
- const cors = require('cors'); 
- const app = express();
- const port = process.env.PORT || 3000;
- 
- app.use(express.json()); // Para processar requisições com corpo JSON
+const express = require("express");
+const { Pool } = require("pg");
+const cors = require("cors");
+const app = express();
+const port = process.env.PORT || 3000;
 
- // Configuração de CORS
- app.use(cors({
-  origin: '*',
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Origin', 'X-Requested-With', 'Accept'],
-}));
- 
- const pool = new Pool({
-   connectionString: process.env.DATABASE_URL
- });
+app.use(express.json()); // Para processar requisições com corpo JSON
+
+// Configuração de CORS
+app.use(
+  cors({
+    origin: "*",
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Origin", "X-Requested-With", "Accept"],
+  })
+);
+
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+});
 
 // Rotas existentes
-app.get('/metrics', async (req, res) => {
+app.get("/metrics", async (req, res) => {
   const { type, from, to } = req.query;
   try {
-    if (type === 'total-noticias') { // Manter por compatibilidade, ajustar depois
+    if (type === "total-noticias") {
+      // Manter por compatibilidade, ajustar depois
       const result = await pool.query(
         `
           SELECT COUNT(*) as total_noticias
@@ -31,7 +34,7 @@ app.get('/metrics', async (req, res) => {
         [from, to]
       );
       res.json({ total_noticias: parseInt(result.rows[0].total_noticias) });
-    } else if (type === 'noticias-por-periodo') {
+    } else if (type === "noticias-por-periodo") {
       const result = await pool.query(
         `
           SELECT data, COUNT(*) as value
@@ -42,17 +45,22 @@ app.get('/metrics', async (req, res) => {
         `,
         [from, to]
       );
-      res.json(result.rows.map(row => ({ name: row.data, value: parseInt(row.value) })));
+      res.json(
+        result.rows.map((row) => ({
+          name: row.data,
+          value: parseInt(row.value),
+        }))
+      );
     } else {
-      res.status(400).json({ error: 'Tipo de métrica inválido' });
+      res.status(400).json({ error: "Tipo de métrica inválido" });
     }
   } catch (error) {
-    console.error('Erro ao buscar métricas:', error.message);
+    console.error("Erro ao buscar métricas:", error.message);
     res.status(500).json({ error: error.message });
   }
 });
 
-app.get('/pontuacao-total', async (req, res) => {
+app.get("/pontuacao-total", async (req, res) => {
   const { from, to } = req.query;
   try {
     const result = await pool.query(
@@ -63,85 +71,103 @@ app.get('/pontuacao-total', async (req, res) => {
       `,
       [from, to]
     );
-    res.json({ total_pontuacao: parseInt(result.rows[0].total_pontuacao) || 0 });
+    res.json({
+      total_pontuacao: parseInt(result.rows[0].total_pontuacao) || 0,
+    });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 });
 
-app.get('/portais-relevantes', async (req, res) => { /* ... */ });
-app.get('/portais', async (req, res) => { /* ... */ });
+app.get("/portais-relevantes", async (req, res) => {
+  /* ... */
+});
+app.get("/portais", async (req, res) => {
+  /* ... */
+});
 
-app.get('/noticias', async (req, res) => {
+app.get("/noticias", async (req, res) => {
   let client;
   try {
-    const { from, to } = req.query;
-    let queryFrom = from || '2025-03-01'; // Data inicial padrão
-    let queryTo = to || new Date().toISOString().split('T')[0]; // Data atual
+    const { from, to, mostrarIrrelevantes } = req.query;
+    let queryFrom = from || "2025-03-01";
+    let queryTo = to || new Date().toISOString().split("T")[0];
 
-    console.log('Intervalo de busca na API:', { queryFrom, queryTo });
+    console.log("Intervalo de busca na API:", { queryFrom, queryTo });
 
     client = await pool.connect();
+
+    // Query base + filtro de relevância
+    let relevanciaFilter = "";
+    if (mostrarIrrelevantes === "true") {
+      relevanciaFilter = "relevancia = false";
+    } else {
+      relevanciaFilter = "(relevancia IS NULL OR relevancia = true)";
+    }
+
     const result = await client.query(
       `
-      SELECT data, portal, titulo, link, pontos, id, tema, avaliacao
-      FROM noticias
-      WHERE TO_DATE(data, 'DD/MM/YYYY') BETWEEN TO_DATE($1, 'YYYY-MM-DD') AND TO_DATE($2, 'YYYY-MM-DD')
-      ORDER BY TO_DATE(data, 'DD/MM/YYYY') DESC
-      `,
+        SELECT data, portal, titulo, link, pontos, id, tema, avaliacao, relevancia
+        FROM noticias
+        WHERE TO_DATE(data, 'DD/MM/YYYY') BETWEEN TO_DATE($1, 'YYYY-MM-DD') AND TO_DATE($2, 'YYYY-MM-DD')
+          AND ${relevanciaFilter}
+        ORDER BY TO_DATE(data, 'DD/MM/YYYY') DESC
+        `,
       [queryFrom, queryTo]
     );
 
-    console.log('Registros de notícias encontrados na API:', result.rows.length);
-    console.log('Primeiros registros (se houver):', result.rows.slice(0, 5));
-
-    const data = result.rows.map(row => ({
-      data: row.data || '', // A data já é uma string no formato DD/MM/YYYY
-      portal: row.portal || 'Desconhecido',
-      titulo: row.titulo || 'Título Não Disponível!',
-      link: row.link || '',
+    const data = result.rows.map((row) => ({
+      data: row.data || "",
+      portal: row.portal || "Desconhecido",
+      titulo: row.titulo || "Título Não Disponível!",
+      link: row.link || "",
       pontos: row.pontos || 0,
       id: row.id,
-      tema: row.tema || '', 
-      avaliacao: row.avaliacao || '' 
+      tema: row.tema || "",
+      avaliacao: row.avaliacao || "",
+      relevancia: row.relevancia, // <-- novo campo incluso!
     }));
 
     res.json(data);
   } catch (error) {
-    console.error('Erro ao buscar notícias:', error.message);
-    console.error('Stack trace:', error.stack);
+    console.error("Erro ao buscar notícias:", error.message);
     res.status(500).json({ error: error.message });
   } finally {
     if (client) client.release();
   }
 });
 
-app.put('/noticias/:id', async (req, res) => {
+app.put("/noticias/:id", async (req, res) => {
   const { id } = req.params;
-  let { tema, avaliacao } = req.body;
+  let { tema, avaliacao, relevancia } = req.body;
 
   try {
-    if (tema === undefined && avaliacao === undefined) {
-      return res.status(400).json({ error: 'Nenhum campo fornecido para atualização. Forneça "tema" ou "avaliacao".' });
+    if (
+      tema === undefined &&
+      avaliacao === undefined &&
+      relevancia === undefined
+    ) {
+      return res
+        .status(400)
+        .json({ error: "Nenhum campo fornecido para atualização." });
     }
 
     const currentNoticia = await pool.query(
-      'SELECT pontos FROM noticias WHERE id = $1',
+      "SELECT pontos FROM noticias WHERE id = $1",
       [id]
     );
 
     if (currentNoticia.rowCount === 0) {
-      return res.status(404).json({ error: 'Notícia não encontrada' });
+      return res.status(404).json({ error: "Notícia não encontrada" });
     }
 
     let pontos = currentNoticia.rows[0].pontos || 0;
     const pontosBrutos = Math.abs(pontos);
 
     if (avaliacao !== undefined) {
-      pontos = avaliacao === 'Negativa' ? -pontosBrutos : pontosBrutos;
+      pontos = avaliacao === "Negativa" ? -pontosBrutos : pontosBrutos;
     }
 
-    // Construção dinâmica da query
     const updates = [];
     const values = [];
     let paramIndex = 1;
@@ -162,36 +188,32 @@ app.put('/noticias/:id', async (req, res) => {
       paramIndex++;
     }
 
-    if (updates.length === 0) {
-      return res.status(400).json({ error: 'Nenhum campo válido fornecido para atualização.' });
+    if (relevancia !== undefined) {
+      updates.push(`relevancia = $${paramIndex}`);
+      values.push(relevancia); // true, false ou null
+      paramIndex++;
     }
 
     values.push(id);
 
     const query = `
       UPDATE noticias
-      SET ${updates.join(', ')}
+      SET ${updates.join(", ")}
       WHERE id = $${paramIndex}
       RETURNING *
     `;
 
     const result = await pool.query(query, values);
 
-    if (result.rowCount === 0) {
-      return res.status(404).json({ error: 'Notícia não encontrada' });
-    }
-
-    console.log('Notícia atualizada:', result.rows[0]);
     res.json(result.rows[0]);
   } catch (error) {
-    console.error('Erro ao atualizar a notícia:', error.message);
-    console.error('Stack trace:', error.stack);
+    console.error("Erro ao atualizar a notícia:", error.message);
     res.status(500).json({ error: error.message });
   }
 });
 
 // Nova rota para buscar os pontos das notícias
-app.get('/noticias/pontos', async (req, res) => {
+app.get("/noticias/pontos", async (req, res) => {
   try {
     const result = await pool.query(
       `
@@ -201,25 +223,25 @@ app.get('/noticias/pontos', async (req, res) => {
       `
     );
 
-    console.log('Registro de pontos encontrados:', result.rows.length);
-    console.log('Primeiros registros (se houver):', result.rows.slice(0, 5));
+    console.log("Registro de pontos encontrados:", result.rows.length);
+    console.log("Primeiros registros (se houver):", result.rows.slice(0, 5));
 
-    const data = result.rows.map(row => ({
+    const data = result.rows.map((row) => ({
       id: row.id,
-      titulo: row.titulo || 'Título Não Disponível',
-      pontos: row.pontos || 0
+      titulo: row.titulo || "Título Não Disponível",
+      pontos: row.pontos || 0,
     }));
 
     res.json(data);
   } catch (error) {
-    console.error('Erro ao buscar pontos das notícias:', error.message);
-    console.error('Stack trace:', error.stack);
+    console.error("Erro ao buscar pontos das notícias:", error.message);
+    console.error("Stack trace:", error.stack);
     res.status(500).json({ error: error.message });
   }
 });
 
 // (Opcional) Rota para buscar pontos de uma notícia específica por ID
- /*
+/*
  app.get('/noticias/:id/pontos', async (req, res) => {
    const { id } = req.params;
  
