@@ -89,15 +89,21 @@ app.get("/portais", async (req, res) => {
 app.get("/noticias", async (req, res) => {
   let client;
   try {
-    const { from, to, mostrarIrrelevantes } = req.query;
+    const { from, to, mostrarIrrelevantes, after, limit = 50 } = req.query;
     let queryFrom = from || "2025-03-01";
     let queryTo = to || new Date().toISOString().split("T")[0];
+    const limitNum = Math.min(parseInt(limit, 10), 100); // Limite máximo de 100
 
-    console.log("Intervalo de busca na API:", { queryFrom, queryTo });
+    console.log("Parâmetros recebidos:", { queryFrom, queryTo, mostrarIrrelevantes, after, limit: limitNum });
+
+    // Validação básica
+    if (limitNum <= 0) {
+      return res.status(400).json({ error: "O parâmetro 'limit' deve ser um número positivo" });
+    }
 
     client = await pool.connect();
 
-    // Query base + filtro de relevância
+    // Filtro de relevância
     let relevanciaFilter = "";
     if (mostrarIrrelevantes === "true") {
       relevanciaFilter = "relevancia = false";
@@ -105,16 +111,60 @@ app.get("/noticias", async (req, res) => {
       relevanciaFilter = "(relevancia IS NULL OR relevancia = true)";
     }
 
-    const result = await client.query(
+    // Contar o total de registros
+    const countResult = await client.query(
       `
-        SELECT data, portal, titulo, link, pontos, id, tema, avaliacao, relevancia
+        SELECT COUNT(*)
         FROM noticias
         WHERE TO_DATE(data, 'DD/MM/YYYY') BETWEEN TO_DATE($1, 'YYYY-MM-DD') AND TO_DATE($2, 'YYYY-MM-DD')
           AND ${relevanciaFilter}
-        ORDER BY TO_DATE(data, 'DD/MM/YYYY') DESC
-        `,
+      `,
       [queryFrom, queryTo]
     );
+    const total = parseInt(countResult.rows[0].count, 10);
+
+    // Parsear o cursor (after)
+    let cursorDate = null;
+    let cursorId = null;
+    if (after) {
+      const [dateStr, idStr] = after.split("_");
+      if (!dateStr || !idStr) {
+        return res.status(400).json({ error: "Formato inválido para o parâmetro 'after'" });
+      }
+      cursorDate = dateStr; // Formato YYYY-MM-DD
+      cursorId = parseInt(idStr, 10);
+      if (isNaN(cursorId)) {
+        return res.status(400).json({ error: "ID no parâmetro 'after' deve ser um número" });
+      }
+    }
+
+    // Construir a query principal
+    let query = `
+      SELECT data, portal, titulo, link, pontos, id, tema, avaliacao, relevancia
+      FROM noticias
+      WHERE TO_DATE(data, 'DD/MM/YYYY') BETWEEN TO_DATE($1, 'YYYY-MM-DD') AND TO_DATE($2, 'YYYY-MM-DD')
+        AND ${relevanciaFilter}
+    `;
+    const values = [queryFrom, queryTo];
+
+    // Adicionar condição do cursor
+    if (cursorDate && cursorId) {
+      query += `
+        AND (TO_DATE(data, 'DD/MM/YYYY') < TO_DATE($3, 'YYYY-MM-DD')
+          OR (TO_DATE(data, 'DD/MM/YYYY') = TO_DATE($3, 'YYYY-MM-DD') AND id < $4))
+      `;
+      values.push(cursorDate, cursorId);
+    }
+
+    // Adicionar ordenação e limite
+    query += `
+      ORDER BY TO_DATE(data, 'DD/MM/YYYY') DESC, id DESC
+      LIMIT $${values.length + 1}
+    `;
+    values.push(limitNum);
+
+    // Executar a query
+    const result = await client.query(query, values);
 
     const data = result.rows.map((row) => ({
       data: row.data || "",
@@ -125,10 +175,18 @@ app.get("/noticias", async (req, res) => {
       id: row.id,
       tema: row.tema || "",
       avaliacao: row.avaliacao || "",
-      relevancia: row.relevancia, // <-- novo campo incluso!
+      relevancia: row.relevancia,
     }));
 
-    res.json(data);
+    // Determinar o nextCursor
+    let nextCursor = null;
+    if (data.length === limitNum) {
+      const lastItem = data[data.length - 1];
+      const lastDate = new Date(lastItem.data.split("/").reverse().join("-")).toISOString().split("T")[0];
+      nextCursor = `${lastDate}_${lastItem.id}`;
+    }
+
+    res.json({ data, nextCursor, total });
   } catch (error) {
     console.error("Erro ao buscar notícias:", error.message);
     res.status(500).json({ error: error.message });
