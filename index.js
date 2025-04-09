@@ -92,18 +92,16 @@ app.get("/noticias", async (req, res) => {
     const { from, to, mostrarIrrelevantes, after, limit = 50 } = req.query;
     let queryFrom = from || "2025-03-01";
     let queryTo = to || new Date().toISOString().split("T")[0];
-    const limitNum = Math.min(parseInt(limit, 10), 100); // Limite máximo de 100
+    const limitNum = Math.min(parseInt(limit, 10), 100);
 
     console.log("Parâmetros recebidos:", { queryFrom, queryTo, mostrarIrrelevantes, after, limit: limitNum });
 
-    // Validação básica
     if (limitNum <= 0) {
       return res.status(400).json({ error: "O parâmetro 'limit' deve ser um número positivo" });
     }
 
     client = await pool.connect();
 
-    // Filtro de relevância
     let relevanciaFilter = "";
     if (mostrarIrrelevantes === "true") {
       relevanciaFilter = "relevancia = false";
@@ -111,7 +109,6 @@ app.get("/noticias", async (req, res) => {
       relevanciaFilter = "(relevancia IS NULL OR relevancia = true)";
     }
 
-    // Contar o total de registros
     const countResult = await client.query(
       `
         SELECT COUNT(*)
@@ -123,7 +120,6 @@ app.get("/noticias", async (req, res) => {
     );
     const total = parseInt(countResult.rows[0].count, 10);
 
-    // Parsear o cursor (after)
     let cursorDate = null;
     let cursorId = null;
     if (after) {
@@ -131,23 +127,21 @@ app.get("/noticias", async (req, res) => {
       if (!dateStr || !idStr) {
         return res.status(400).json({ error: "Formato inválido para o parâmetro 'after'" });
       }
-      cursorDate = dateStr; // Formato YYYY-MM-DD
+      cursorDate = dateStr;
       cursorId = parseInt(idStr, 10);
       if (isNaN(cursorId)) {
         return res.status(400).json({ error: "ID no parâmetro 'after' deve ser um número" });
       }
     }
 
-    // Construir a query principal
     let query = `
-      SELECT data, portal, titulo, link, pontos, id, tema, avaliacao, relevancia
+      SELECT data, portal, titulo, link, pontos, id, tema, avaliacao, relevancia, estrategica
       FROM noticias
       WHERE TO_DATE(data, 'DD/MM/YYYY') BETWEEN TO_DATE($1, 'YYYY-MM-DD') AND TO_DATE($2, 'YYYY-MM-DD')
         AND ${relevanciaFilter}
     `;
     const values = [queryFrom, queryTo];
 
-    // Adicionar condição do cursor
     if (cursorDate && cursorId) {
       query += `
         AND (TO_DATE(data, 'DD/MM/YYYY') < TO_DATE($3, 'YYYY-MM-DD')
@@ -156,14 +150,12 @@ app.get("/noticias", async (req, res) => {
       values.push(cursorDate, cursorId);
     }
 
-    // Adicionar ordenação e limite
     query += `
       ORDER BY TO_DATE(data, 'DD/MM/YYYY') DESC, id DESC
       LIMIT $${values.length + 1}
     `;
     values.push(limitNum);
 
-    // Executar a query
     const result = await client.query(query, values);
 
     const data = result.rows.map((row) => ({
@@ -176,9 +168,9 @@ app.get("/noticias", async (req, res) => {
       tema: row.tema || "",
       avaliacao: row.avaliacao || "",
       relevancia: row.relevancia,
+      estrategica: row.estrategica, // Retorna true, false ou null diretamente
     }));
 
-    // Determinar o nextCursor
     let nextCursor = null;
     if (data.length === limitNum) {
       const lastItem = data[data.length - 1];
@@ -197,20 +189,20 @@ app.get("/noticias", async (req, res) => {
 
 app.put("/noticias/:id", async (req, res) => {
   const { id } = req.params;
-  let { tema, avaliacao, relevancia } = req.body;
+  let { tema, avaliacao, relevancia, estrategica } = req.body;
 
   try {
     if (
       tema === undefined &&
       avaliacao === undefined &&
-      relevancia === undefined
+      relevancia === undefined &&
+      estrategica === undefined
     ) {
       return res
         .status(400)
         .json({ error: "Nenhum campo fornecido para atualização." });
     }
 
-    // Busca a pontuação atual da notícia no banco de dados
     const currentNoticia = await pool.query(
       "SELECT pontos FROM noticias WHERE id = $1",
       [id]
@@ -220,17 +212,15 @@ app.put("/noticias/:id", async (req, res) => {
       return res.status(404).json({ error: "Notícia não encontrada" });
     }
 
-    // Obtém a pontuação atual ou define como 0 se não existir
     let pontos = currentNoticia.rows[0].pontos || 0;
-    const pontosBrutos = Math.abs(pontos); // Mantém o valor absoluto da pontuação original
+    const pontosBrutos = Math.abs(pontos);
 
-    // Calcula a nova pontuação para pontos_new com base na avaliação
     let pontosNew;
     if (avaliacao !== undefined) {
       if (avaliacao === null) {
-        pontosNew = null; // Define pontos_new como NULL quando avaliacao é "Selecionar"
+        pontosNew = null;
       } else {
-        pontosNew = avaliacao === "Negativa" ? -pontosBrutos : pontosBrutos; // Positiva, Neutra ou outro valor
+        pontosNew = avaliacao === "Negativa" ? -pontosBrutos : pontosBrutos;
       }
     }
 
@@ -248,16 +238,20 @@ app.put("/noticias/:id", async (req, res) => {
       updates.push(`avaliacao = $${paramIndex}`);
       values.push(avaliacao);
       paramIndex++;
-
-      // Salva a nova pontuação em pontos_new
       updates.push(`pontos_new = $${paramIndex}`);
-      values.push(pontosNew); // Pode ser NULL ou um número
+      values.push(pontosNew);
       paramIndex++;
     }
 
     if (relevancia !== undefined) {
       updates.push(`relevancia = $${paramIndex}`);
       values.push(relevancia);
+      paramIndex++;
+    }
+
+    if (estrategica !== undefined) {
+      updates.push(`estrategica = $${paramIndex}`);
+      values.push(estrategica); // true, false ou null
       paramIndex++;
     }
 
@@ -307,40 +301,47 @@ app.get("/noticias/pontos", async (req, res) => {
   }
 });
 
-// (Opcional) Rota para buscar pontos de uma notícia específica por ID
-/*
- app.get('/noticias/:id/pontos', async (req, res) => {
-   const { id } = req.params;
- 
-   try {
-     const result = await pool.query(
-       `
-         SELECT id, titulo, pontos
-         FROM noticias
-         WHERE id = $1
-       `,
-       [id]
-     );
- 
-     if (result.rowCount === 0) {
-       return res.status(404).json({ error: 'Notícia não encontrada' });
-     }
- 
-     const data = {
-       id: result.rows[0].id,
-       titulo: result.rows[0].titulo || 'Título Não Disponível',
-       pontos: result.rows[0].pontos || 0
-     };
- 
-     console.log('Pontos da notícia encontrados:', data);
-     res.json(data);
-   } catch (error) {
-     console.error('Erro ao buscar pontos da notícia:', error.message);
-     console.error('Stack trace:', error.stack);
-     res.status(500).json({ error: error.message });
-   }
- });
- */
+app.get("/semana-estrategica", async (req, res) => {
+  const { data } = req.query; // Data da notícia recebida do frontend
+  try {
+    if (!data) {
+      return res.status(400).json({ error: "Parâmetro 'data' é obrigatório" });
+    }
+
+    // Converter a data recebida (formato DD/MM/YYYY) para comparação
+    const dataNoticia = data.split("/").reverse().join("-"); // Converte para YYYY-MM-DD
+
+    const result = await pool.query(
+      `
+        SELECT id, data_inicial, data_final, ciclo, categoria, subcategoria
+        FROM semana_estrategica
+        WHERE TO_DATE($1, 'YYYY-MM-DD') BETWEEN TO_DATE(data_inicial, 'DD/MM/YYYY') AND TO_DATE(data_final, 'DD/MM/YYYY')
+      `,
+      [dataNoticia]
+    );
+
+    if (result.rowCount === 0) {
+      return res.json({
+        categoria: null,
+        message: "Nenhuma semana estratégica encontrada para essa data",
+      });
+    }
+
+    const semana = result.rows[0];
+    res.json({
+      id: semana.id,
+      data_inicial: semana.data_inicial,
+      data_final: semana.data_final,
+      ciclo: semana.ciclo,
+      categoria: semana.categoria,
+      subcategoria: semana.subcategoria,
+    });
+  } catch (error) {
+    console.error("Erro ao buscar semana estratégica:", error.message);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 
 app.listen(port, () => {
   console.log(`API rodando em http://localhost:${port}`);
