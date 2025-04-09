@@ -227,7 +227,7 @@ app.put("/noticias/:id", async (req, res) => {
     // Calcula a nova pontuação para pontos_new com base na avaliação
     let pontosNew;
     if (avaliacao !== undefined) {
-      if (avaliacao === "Selecionar") {
+      if (avaliacao === null) {
         pontosNew = null; // Define pontos_new como NULL quando avaliacao é "Selecionar"
       } else {
         pontosNew = avaliacao === "Negativa" ? -pontosBrutos : pontosBrutos; // Positiva, Neutra ou outro valor
