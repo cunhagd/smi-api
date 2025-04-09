@@ -225,9 +225,13 @@ app.put("/noticias/:id", async (req, res) => {
     const pontosBrutos = Math.abs(pontos); // Mantém o valor absoluto da pontuação original
 
     // Calcula a nova pontuação para pontos_new com base na avaliação
-    let pontosNew = pontosBrutos; // Valor padrão (positivo)
+    let pontosNew;
     if (avaliacao !== undefined) {
-      pontosNew = avaliacao === "Negativa" ? -pontosBrutos : pontosBrutos;
+      if (avaliacao === "Selecionar") {
+        pontosNew = null; // Define pontos_new como NULL quando avaliacao é "Selecionar"
+      } else {
+        pontosNew = avaliacao === "Negativa" ? -pontosBrutos : pontosBrutos; // Positiva, Neutra ou outro valor
+      }
     }
 
     const updates = [];
@@ -245,9 +249,9 @@ app.put("/noticias/:id", async (req, res) => {
       values.push(avaliacao);
       paramIndex++;
 
-      // Salva a nova pontuação em pontos_new em vez de pontos
+      // Salva a nova pontuação em pontos_new
       updates.push(`pontos_new = $${paramIndex}`);
-      values.push(pontosNew);
+      values.push(pontosNew); // Pode ser NULL ou um número
       paramIndex++;
     }
 
