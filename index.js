@@ -210,6 +210,7 @@ app.put("/noticias/:id", async (req, res) => {
         .json({ error: "Nenhum campo fornecido para atualização." });
     }
 
+    // Busca a pontuação atual da notícia no banco de dados
     const currentNoticia = await pool.query(
       "SELECT pontos FROM noticias WHERE id = $1",
       [id]
@@ -219,11 +220,14 @@ app.put("/noticias/:id", async (req, res) => {
       return res.status(404).json({ error: "Notícia não encontrada" });
     }
 
+    // Obtém a pontuação atual ou define como 0 se não existir
     let pontos = currentNoticia.rows[0].pontos || 0;
-    const pontosBrutos = Math.abs(pontos);
+    const pontosBrutos = Math.abs(pontos); // Mantém o valor absoluto da pontuação original
 
+    // Calcula a nova pontuação para pontos_new com base na avaliação
+    let pontosNew = pontosBrutos; // Valor padrão (positivo)
     if (avaliacao !== undefined) {
-      pontos = avaliacao === "Negativa" ? -pontosBrutos : pontosBrutos;
+      pontosNew = avaliacao === "Negativa" ? -pontosBrutos : pontosBrutos;
     }
 
     const updates = [];
@@ -241,14 +245,15 @@ app.put("/noticias/:id", async (req, res) => {
       values.push(avaliacao);
       paramIndex++;
 
-      updates.push(`pontos = $${paramIndex}`);
-      values.push(pontos);
+      // Salva a nova pontuação em pontos_new em vez de pontos
+      updates.push(`pontos_new = $${paramIndex}`);
+      values.push(pontosNew);
       paramIndex++;
     }
 
     if (relevancia !== undefined) {
       updates.push(`relevancia = $${paramIndex}`);
-      values.push(relevancia); // true, false ou null
+      values.push(relevancia);
       paramIndex++;
     }
 
