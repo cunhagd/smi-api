@@ -89,12 +89,12 @@ app.get("/portais", async (req, res) => {
 app.get("/noticias", async (req, res) => {
   let client;
   try {
-    const { from, to, mostrarIrrelevantes, after, limit = 50 } = req.query;
+    const { from, to, mostrarIrrelevantes, mostrarEstrategicas, after, limit = 50 } = req.query;
     let queryFrom = from || "2025-03-01";
     let queryTo = to || new Date().toISOString().split("T")[0];
     const limitNum = Math.min(parseInt(limit, 10), 100);
 
-    console.log("Parâmetros recebidos:", { queryFrom, queryTo, mostrarIrrelevantes, after, limit: limitNum });
+    console.log("Parâmetros recebidos:", { queryFrom, queryTo, mostrarIrrelevantes, mostrarEstrategicas, after, limit: limitNum });
 
     if (limitNum <= 0) {
       return res.status(400).json({ error: "O parâmetro 'limit' deve ser um número positivo" });
@@ -102,11 +102,13 @@ app.get("/noticias", async (req, res) => {
 
     client = await pool.connect();
 
-    let relevanciaFilter = "";
-    if (mostrarIrrelevantes === "true") {
-      relevanciaFilter = "relevancia = false";
+    let filter = "";
+    if (mostrarEstrategicas === "true") {
+      filter = "estrategica = true"; // Filtra apenas notícias com estrategica = true
+    } else if (mostrarIrrelevantes === "true") {
+      filter = "relevancia = false"; // Filtra irrelevantes
     } else {
-      relevanciaFilter = "(relevancia IS NULL OR relevancia = true)";
+      filter = "(relevancia IS NULL OR relevancia = true)"; // Padrão
     }
 
     const countResult = await client.query(
@@ -114,7 +116,7 @@ app.get("/noticias", async (req, res) => {
         SELECT COUNT(*)
         FROM noticias
         WHERE TO_DATE(data, 'DD/MM/YYYY') BETWEEN TO_DATE($1, 'YYYY-MM-DD') AND TO_DATE($2, 'YYYY-MM-DD')
-          AND ${relevanciaFilter}
+          AND ${filter}
       `,
       [queryFrom, queryTo]
     );
@@ -135,10 +137,10 @@ app.get("/noticias", async (req, res) => {
     }
 
     let query = `
-      SELECT data, portal, titulo, link, pontos, id, tema, avaliacao, relevancia, estrategica
+      SELECT data, portal, titulo, link, pontos, id, tema, avaliacao, relevancia, estrategica, categoria, subcategoria
       FROM noticias
       WHERE TO_DATE(data, 'DD/MM/YYYY') BETWEEN TO_DATE($1, 'YYYY-MM-DD') AND TO_DATE($2, 'YYYY-MM-DD')
-        AND ${relevanciaFilter}
+        AND ${filter}
     `;
     const values = [queryFrom, queryTo];
 
@@ -168,7 +170,9 @@ app.get("/noticias", async (req, res) => {
       tema: row.tema || "",
       avaliacao: row.avaliacao || "",
       relevancia: row.relevancia,
-      estrategica: row.estrategica, // Retorna true, false ou null diretamente
+      estrategica: row.estrategica,
+      categoria: row.categoria || null,
+      subcategoria: row.subcategoria || null,
     }));
 
     let nextCursor = null;
@@ -189,14 +193,16 @@ app.get("/noticias", async (req, res) => {
 
 app.put("/noticias/:id", async (req, res) => {
   const { id } = req.params;
-  let { tema, avaliacao, relevancia, estrategica } = req.body;
+  let { tema, avaliacao, relevancia, estrategica, categoria, subcategoria } = req.body;
 
   try {
     if (
       tema === undefined &&
       avaliacao === undefined &&
       relevancia === undefined &&
-      estrategica === undefined
+      estrategica === undefined &&
+      categoria === undefined &&
+      subcategoria === undefined
     ) {
       return res
         .status(400)
@@ -251,7 +257,19 @@ app.put("/noticias/:id", async (req, res) => {
 
     if (estrategica !== undefined) {
       updates.push(`estrategica = $${paramIndex}`);
-      values.push(estrategica); // true, false ou null
+      values.push(estrategica);
+      paramIndex++;
+    }
+
+    if (categoria !== undefined) {
+      updates.push(`categoria = $${paramIndex}`);
+      values.push(categoria);
+      paramIndex++;
+    }
+
+    if (subcategoria !== undefined) {
+      updates.push(`subcategoria = $${paramIndex}`);
+      values.push(subcategoria);
       paramIndex++;
     }
 
