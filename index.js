@@ -3,7 +3,9 @@ const { Pool } = require("pg");
 const cors = require("cors");
 const app = express();
 const port = process.env.PORT || 3000;
+require('dotenv').config();
 
+// Middleware
 app.use(express.json()); // Para processar requisições com corpo JSON
 
 // Configuração de CORS
@@ -15,8 +17,17 @@ app.use(
   })
 );
 
+// Configuração do banco de dados
+const DATABASE_URL = process.env.DATABASE_URL;
+
+if (!DATABASE_URL) {
+  console.error('Erro: DATABASE_URL não está definida. Verifique o arquivo .env ou as variáveis de ambiente.');
+  process.exit(1);
+}
+
 const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
+  connectionString: DATABASE_URL,
+  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false, // Ativar SSL em produção
 });
 
 // Rotas existentes
@@ -74,6 +85,7 @@ app.get("/pontuacao-total", async (req, res) => {
       total_pontuacao: parseInt(result.rows[0].total_pontuacao) || 0,
     });
   } catch (error) {
+    console.error("Erro ao buscar pontuação total:", error.message);
     res.status(500).json({ error: error.message });
   }
 });
@@ -106,11 +118,11 @@ app.get("/noticias", async (req, res) => {
 
     let filter = "";
     if (mostrarEstrategicas === "true") {
-      filter = "n.estrategica = true"; // Filtra apenas notícias com estrategica = true
+      filter = "n.estrategica = true";
     } else if (mostrarIrrelevantes === "true") {
-      filter = "n.relevancia = false"; // Filtra irrelevantes
+      filter = "n.relevancia = false";
     } else {
-      filter = "(n.relevancia IS NULL OR n.relevancia = true)"; // Padrão
+      filter = "(n.relevancia IS NULL OR n.relevancia = true)";
     }
 
     const countResult = await client.query(
@@ -166,6 +178,7 @@ app.get("/noticias", async (req, res) => {
     values.push(limitNum);
 
     const result = await client.query(query, values);
+    console.log("Dados brutos retornados do banco (primeiras 3 linhas):", result.rows.slice(0, 3));
 
     const data = result.rows.map((row) => ({
       data: row.data || "",
@@ -198,126 +211,103 @@ app.get("/noticias", async (req, res) => {
   }
 });
 
+// Rota para atualizar notícias (unificada)
 app.put("/noticias/:id", async (req, res) => {
   const { id } = req.params;
-  let { tema, avaliacao, relevancia, estrategica, categoria, subcategoria } = req.body;
+  const { estrategica, relevancia, ...otherFields } = req.body;
 
+  let client;
   try {
-    if (
-      tema === undefined &&
-      avaliacao === undefined &&
-      relevancia === undefined &&
-      estrategica === undefined &&
-      categoria === undefined &&
-      subcategoria === undefined
-    ) {
-      return res
-        .status(400)
-        .json({ error: "Nenhum campo fornecido para atualização." });
-    }
+    client = await pool.connect();
 
-    const currentNoticia = await client.query(
-      "SELECT pontos, data FROM noticias WHERE id = $1",
-      [id]
-    );
+    // Log para depuração
+    console.log(`Recebendo requisição para atualizar notícia ID ${id}:`, { estrategica, relevancia, otherFields });
 
-    if (currentNoticia.rowCount === 0) {
-      return res.status(404).json({ error: "Notícia não encontrada" });
-    }
-
-    let pontos = currentNoticia.rows[0].pontos || 0;
-    const pontosBrutos = Math.abs(pontos);
-    const noticiaData = currentNoticia.rows[0].data;
-
-    let pontosNew;
-    if (avaliacao !== undefined) {
-      if (avaliacao === null) {
-        pontosNew = null;
-      } else {
-        pontosNew = avaliacao === "Negativa" ? -pontosBrutos : pontosBrutos;
-      }
-    }
-
-    // Se estrategica for true, buscar categoria e subcategoria da semana_estrategica
-    let autoCategoria = categoria;
-    let autoSubcategoria = subcategoria;
-    if (estrategica === true && (categoria === undefined || subcategoria === undefined)) {
-      const semanaResult = await pool.query(
-        `
-          SELECT categoria, subcategoria
-          FROM semana_estrategica
-          WHERE TO_DATE($1, 'DD/MM/YYYY') BETWEEN TO_DATE(data_inicial, 'DD/MM/YYYY') AND TO_DATE(data_final, 'DD/MM/YYYY')
-        `,
-        [noticiaData]
+    // Se a notícia estiver sendo marcada como estratégica
+    if (estrategica === true) {
+      // Primeiro, obter a data da notícia
+      const noticiaResult = await client.query(
+        `SELECT data FROM noticias WHERE id = $1`,
+        [id]
       );
-      if (semanaResult.rowCount > 0) {
-        autoCategoria = autoCategoria || semanaResult.rows[0].categoria;
-        autoSubcategoria = autoSubcategoria || semanaResult.rows[0].subcategoria;
+
+      if (noticiaResult.rows.length === 0) {
+        return res.status(404).json({ error: "Notícia não encontrada" });
+      }
+
+      const dataNoticia = noticiaResult.rows[0].data; // Formato DD/MM/YYYY
+      console.log(`Notícia ID ${id} com data ${dataNoticia} marcada como estratégica`);
+
+      // Buscar semana estratégica que contém essa data
+      const semanaResult = await client.query(
+        `SELECT categoria, subcategoria FROM semana_estrategica 
+         WHERE TO_DATE($1, 'DD/MM/YYYY') BETWEEN 
+         TO_DATE(data_inicial, 'DD/MM/YYYY') AND TO_DATE(data_final, 'DD/MM/YYYY')`,
+        [dataNoticia]
+      );
+
+      // Se encontrou uma semana estratégica para esta data
+      if (semanaResult.rows.length > 0) {
+        const { categoria, subcategoria } = semanaResult.rows[0];
+        console.log(`Semana estratégica encontrada para a data ${dataNoticia}: categoria=${categoria}, subcategoria=${subcategoria}`);
+
+        // Atualizar a notícia com a categoria e subcategoria da semana estratégica
+        const updateResult = await client.query(
+          `UPDATE noticias 
+           SET estrategica = $1, categoria = $2, subcategoria = $3
+           WHERE id = $4
+           RETURNING *`,
+          [estrategica, categoria, subcategoria, id]
+        );
+
+        console.log(`Notícia ID ${id} atualizada com sucesso:`, updateResult.rows[0]);
+        return res.json(updateResult.rows[0]);
+      } else {
+        console.log(`Nenhuma semana estratégica encontrada para a data ${dataNoticia}`);
       }
     }
 
-    const updates = [];
-    const values = [];
-    let paramIndex = 1;
+    // Caso não seja estratégica ou não encontre semana correspondente, faz a atualização normal
+    const fields = { estrategica, relevancia, ...otherFields };
+    const keys = Object.keys(fields).filter(key => fields[key] !== undefined); // Ignorar campos undefined
 
-    if (tema !== undefined) {
-      updates.push(`tema = $${paramIndex}`);
-      values.push(tema);
-      paramIndex++;
+    if (keys.length === 0) {
+      return res.status(400).json({ error: "Nenhum campo válido para atualização" });
     }
 
-    if (avaliacao !== undefined) {
-      updates.push(`avaliacao = $${paramIndex}`);
-      values.push(avaliacao);
-      paramIndex++;
-      updates.push(`pontos_new = $${paramIndex}`);
-      values.push(pontosNew);
-      paramIndex++;
-    }
+    // Construir a query dinamicamente, tratando valores null explicitamente
+    const setClauses = keys.map((key, i) => {
+      if (fields[key] === null) {
+        return `${key} = NULL`; // Definir explicitamente como NULL no SQL
+      }
+      return `${key} = $${i + 1}`;
+    }).join(', ');
 
-    if (relevancia !== undefined) {
-      updates.push(`relevancia = $${paramIndex}`);
-      values.push(relevancia);
-      paramIndex++;
-    }
-
-    if (estrategica !== undefined) {
-      updates.push(`estrategica = $${paramIndex}`);
-      values.push(estrategica);
-      paramIndex++;
-    }
-
-    if (autoCategoria !== undefined) {
-      updates.push(`categoria = $${paramIndex}`);
-      values.push(autoCategoria);
-      paramIndex++;
-    }
-
-    if (autoSubcategoria !== undefined) {
-      updates.push(`subcategoria = $${paramIndex}`);
-      values.push(autoSubcategoria);
-      paramIndex++;
-    }
-
-    values.push(id);
+    // Filtrar os valores que não são null para passar como parâmetros
+    const values = keys
+      .filter(key => fields[key] !== null)
+      .map(key => fields[key]);
 
     const query = `
       UPDATE noticias
-      SET ${updates.join(", ")}
-      WHERE id = $${paramIndex}
+      SET ${setClauses}
+      WHERE id = $${values.length + 1}
       RETURNING *
     `;
 
-    const result = await pool.query(query, values);
+    const result = await client.query(query, [...values, id]);
+    console.log(`Notícia ID ${id} atualizada (atualização normal):`, result.rows[0]);
 
     res.json(result.rows[0]);
   } catch (error) {
-    console.error("Erro ao atualizar a notícia:", error.message);
+    console.error("Erro ao atualizar notícia:", error.message);
     res.status(500).json({ error: error.message });
+  } finally {
+    if (client) client.release();
   }
 });
 
-// Nova rota para buscar os pontos das notícias
+// Rota para buscar os pontos das notícias
 app.get("/noticias/pontos", async (req, res) => {
   try {
     const result = await pool.query(
@@ -352,20 +342,18 @@ app.get("/semana-estrategica", async (req, res) => {
     client = await pool.connect();
     console.log("Conexão com o banco estabelecida para buscar semanas estratégicas");
 
-    const dataParam = req.query.data; // Obtém o parâmetro 'data' da query string
+    const dataParam = req.query.data;
     let queryText;
     let queryValues = [];
 
     if (dataParam) {
-      // Valida o formato do parâmetro 'data' (deve ser DD/MM/YYYY)
       const dateRegex = /^\d{2}\/\d{2}\/\d{4}$/;
       if (!dateRegex.test(dataParam)) {
         return res.status(400).json({ error: "Parâmetro 'data' deve estar no formato DD/MM/YYYY" });
       }
 
-      // Converte a data para o formato YYYY-MM-DD para comparação
       const [day, month, year] = dataParam.split("/");
-      const dataFormatted = `${year}-${month}-${day}`; // Formato YYYY-MM-DD
+      const dataFormatted = `${year}-${month}-${day}`;
 
       queryText = `
         SELECT id, data_inicial, data_final, ciclo, categoria, subcategoria
@@ -375,7 +363,6 @@ app.get("/semana-estrategica", async (req, res) => {
       `;
       queryValues = [dataFormatted];
     } else {
-      // Se não houver parâmetro 'data', retorna todas as semanas
       queryText = `
         SELECT id, data_inicial, data_final, ciclo, categoria, subcategoria
         FROM semana_estrategica
@@ -482,12 +469,14 @@ app.post("/semana-estrategica", async (req, res) => {
   }
 });
 
+// Rota para Semana Estratégica (PUT)
 app.put("/semana-estrategica/:id", async (req, res) => {
   const { id } = req.params;
   const { data_inicial, data_final, ciclo, categoria, subcategoria } = req.body;
 
-  const client = await pool.connect();
+  let client;
   try {
+    client = await pool.connect();
     await client.query('BEGIN');
 
     // Validação do formato das datas
@@ -568,10 +557,11 @@ app.put("/semana-estrategica/:id", async (req, res) => {
     console.error("Erro ao atualizar semana:", error.message);
     res.status(error.status || 500).json({ error: error.message });
   } finally {
-    client.release();
+    if (client) client.release();
   }
 });
 
+// Inicializar o servidor
 app.listen(port, () => {
   console.log(`API rodando em http://localhost:${port}`);
 });
