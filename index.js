@@ -96,26 +96,22 @@ app.get("/noticias", async (req, res) => {
     let queryTo = to || new Date().toISOString().split("T")[0];
     const limitNum = Math.min(parseInt(limit, 10), 100);
 
-    console.log("Parâmetros recebidos:", { from, to, mostrarIrrelevantes, mostrarEstrategicas, after, limit: limitNum });
-    console.log("queryFrom:", queryFrom, "queryTo:", queryTo);
+    console.log("Parâmetros recebidos:", { queryFrom, queryTo, mostrarIrrelevantes, mostrarEstrategicas, after, limit: limitNum });
 
     if (limitNum <= 0) {
       return res.status(400).json({ error: "O parâmetro 'limit' deve ser um número positivo" });
     }
 
-    console.log("Conectando ao banco com DATABASE_URL:", process.env.DATABASE_URL);
-
     client = await pool.connect();
 
     let filter = "";
     if (mostrarEstrategicas === "true") {
-      filter = "n.estrategica = true";
+      filter = "n.estrategica = true"; // Filtra apenas notícias com estrategica = true
     } else if (mostrarIrrelevantes === "true") {
-      filter = "n.relevancia = false";
+      filter = "n.relevancia = false"; // Filtra irrelevantes
     } else {
-      filter = "(n.relevancia IS NULL OR n.relevancia = true)";
+      filter = "(n.relevancia IS NULL OR n.relevancia = true)"; // Padrão
     }
-    console.log("Filtro aplicado:", filter);
 
     const countResult = await client.query(
       `
@@ -123,7 +119,6 @@ app.get("/noticias", async (req, res) => {
         FROM noticias n
         WHERE TO_DATE(n.data, 'DD/MM/YYYY') BETWEEN TO_DATE($1, 'YYYY-MM-DD') AND TO_DATE($2, 'YYYY-MM-DD')
           AND ${filter}
-          AND n.data IS NOT NULL
       `,
       [queryFrom, queryTo]
     );
@@ -145,43 +140,32 @@ app.get("/noticias", async (req, res) => {
     }
 
     let query = `
-      SELECT subquery.*, 
-             COALESCE(subquery.categoria, se.categoria) AS categoria,
-             COALESCE(subquery.subcategoria, se.subcategoria) AS subcategoria
-      FROM (
-        SELECT n.data, n.portal, n.titulo, n.link, n.pontos, n.id, n.tema, n.avaliacao, n.relevancia, n.estrategica,
-               n.categoria, n.subcategoria,
-               TO_DATE(n.data, 'DD/MM/YYYY') AS parsed_date
-        FROM noticias n
-        WHERE TO_DATE(n.data, 'DD/MM/YYYY') BETWEEN TO_DATE($1, 'YYYY-MM-DD') AND TO_DATE($2, 'YYYY-MM-DD')
-          AND ${filter}
-          AND n.data IS NOT NULL
-        ORDER BY TO_DATE(n.data, 'DD/MM/YYYY') DESC, n.id DESC
-      ) AS subquery
+      SELECT n.data, n.portal, n.titulo, n.link, n.pontos, n.id, n.tema, n.avaliacao, n.relevancia, n.estrategica,
+             COALESCE(n.categoria, se.categoria) AS categoria,
+             COALESCE(n.subcategoria, se.subcategoria) AS subcategoria
+      FROM noticias n
       LEFT JOIN semana_estrategica se
-      ON TO_DATE(subquery.data, 'DD/MM/YYYY') BETWEEN TO_DATE(se.data_inicial, 'DD/MM/YYYY') AND TO_DATE(se.data_final, 'DD/MM/YYYY')
+      ON TO_DATE(n.data, 'DD/MM/YYYY') BETWEEN TO_DATE(se.data_inicial, 'DD/MM/YYYY') AND TO_DATE(se.data_final, 'DD/MM/YYYY')
+      WHERE TO_DATE(n.data, 'DD/MM/YYYY') BETWEEN TO_DATE($1, 'YYYY-MM-DD') AND TO_DATE($2, 'YYYY-MM-DD')
+        AND ${filter}
     `;
     const values = [queryFrom, queryTo];
 
     if (cursorDate && cursorId) {
       query += `
-        WHERE (TO_DATE(subquery.data, 'DD/MM/YYYY') < TO_DATE($3, 'YYYY-MM-DD')
-          OR (TO_DATE(subquery.data, 'DD/MM/YYYY') = TO_DATE($3, 'YYYY-MM-DD') AND subquery.id < $4))
+        AND (TO_DATE(n.data, 'DD/MM/YYYY') < TO_DATE($3, 'YYYY-MM-DD')
+          OR (TO_DATE(n.data, 'DD/MM/YYYY') = TO_DATE($3, 'YYYY-MM-DD') AND n.id < $4))
       `;
       values.push(cursorDate, cursorId);
     }
 
     query += `
+      ORDER BY TO_DATE(n.data, 'DD/MM/YYYY') DESC, n.id DESC
       LIMIT $${values.length + 1}
     `;
     values.push(limitNum);
 
-    console.log("Executando query:", query);
-    console.log("Valores:", values);
-
     const result = await client.query(query, values);
-
-    console.log("Dados brutos retornados do banco (primeiras 3 linhas):", result.rows.slice(0, 3));
 
     const data = result.rows.map((row) => ({
       data: row.data || "",
@@ -232,8 +216,8 @@ app.put("/noticias/:id", async (req, res) => {
         .json({ error: "Nenhum campo fornecido para atualização." });
     }
 
-    const currentNoticia = await pool.query(
-      "SELECT pontos FROM noticias WHERE id = $1",
+    const currentNoticia = await client.query(
+      "SELECT pontos, data FROM noticias WHERE id = $1",
       [id]
     );
 
@@ -243,6 +227,7 @@ app.put("/noticias/:id", async (req, res) => {
 
     let pontos = currentNoticia.rows[0].pontos || 0;
     const pontosBrutos = Math.abs(pontos);
+    const noticiaData = currentNoticia.rows[0].data;
 
     let pontosNew;
     if (avaliacao !== undefined) {
@@ -250,6 +235,24 @@ app.put("/noticias/:id", async (req, res) => {
         pontosNew = null;
       } else {
         pontosNew = avaliacao === "Negativa" ? -pontosBrutos : pontosBrutos;
+      }
+    }
+
+    // Se estrategica for true, buscar categoria e subcategoria da semana_estrategica
+    let autoCategoria = categoria;
+    let autoSubcategoria = subcategoria;
+    if (estrategica === true && (categoria === undefined || subcategoria === undefined)) {
+      const semanaResult = await pool.query(
+        `
+          SELECT categoria, subcategoria
+          FROM semana_estrategica
+          WHERE TO_DATE($1, 'DD/MM/YYYY') BETWEEN TO_DATE(data_inicial, 'DD/MM/YYYY') AND TO_DATE(data_final, 'DD/MM/YYYY')
+        `,
+        [noticiaData]
+      );
+      if (semanaResult.rowCount > 0) {
+        autoCategoria = autoCategoria || semanaResult.rows[0].categoria;
+        autoSubcategoria = autoSubcategoria || semanaResult.rows[0].subcategoria;
       }
     }
 
@@ -284,15 +287,15 @@ app.put("/noticias/:id", async (req, res) => {
       paramIndex++;
     }
 
-    if (categoria !== undefined) {
+    if (autoCategoria !== undefined) {
       updates.push(`categoria = $${paramIndex}`);
-      values.push(categoria);
+      values.push(autoCategoria);
       paramIndex++;
     }
 
-    if (subcategoria !== undefined) {
+    if (autoSubcategoria !== undefined) {
       updates.push(`subcategoria = $${paramIndex}`);
-      values.push(subcategoria);
+      values.push(autoSubcategoria);
       paramIndex++;
     }
 
