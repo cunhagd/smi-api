@@ -215,12 +215,10 @@ app.get("/noticias", async (req, res) => {
 });
 
 app.put("/noticias/:id", async (req, res) => {
-  let client;
-  try {
-    client = await pool.connect();
-    const { id } = req.params;
-    let { tema, avaliacao, relevancia, estrategica, categoria, subcategoria } = req.body;
+  const { id } = req.params;
+  let { tema, avaliacao, relevancia, estrategica, categoria, subcategoria } = req.body;
 
+  try {
     if (
       tema === undefined &&
       avaliacao === undefined &&
@@ -229,11 +227,13 @@ app.put("/noticias/:id", async (req, res) => {
       categoria === undefined &&
       subcategoria === undefined
     ) {
-      return res.status(400).json({ error: "Nenhum campo fornecido para atualização." });
+      return res
+        .status(400)
+        .json({ error: "Nenhum campo fornecido para atualização." });
     }
 
-    const currentNoticia = await client.query(
-      "SELECT pontos, data FROM noticias WHERE id = $1",
+    const currentNoticia = await pool.query(
+      "SELECT pontos FROM noticias WHERE id = $1",
       [id]
     );
 
@@ -243,7 +243,6 @@ app.put("/noticias/:id", async (req, res) => {
 
     let pontos = currentNoticia.rows[0].pontos || 0;
     const pontosBrutos = Math.abs(pontos);
-    const noticiaData = currentNoticia.rows[0].data;
 
     let pontosNew;
     if (avaliacao !== undefined) {
@@ -251,24 +250,6 @@ app.put("/noticias/:id", async (req, res) => {
         pontosNew = null;
       } else {
         pontosNew = avaliacao === "Negativa" ? -pontosBrutos : pontosBrutos;
-      }
-    }
-
-    // Se estrategica for true, buscar categoria e subcategoria da semana_estrategica
-    let autoCategoria = categoria;
-    let autoSubcategoria = subcategoria;
-    if (estrategica === true && (categoria === undefined || subcategoria === undefined)) {
-      const semanaResult = await client.query(
-        `
-          SELECT categoria, subcategoria
-          FROM semana_estrategica
-          WHERE TO_DATE($1, 'DD/MM/YYYY') BETWEEN TO_DATE(data_inicial, 'DD/MM/YYYY') AND TO_DATE(data_final, 'DD/MM/YYYY')
-        `,
-        [noticiaData]
-      );
-      if (semanaResult.rowCount > 0) {
-        autoCategoria = autoCategoria || semanaResult.rows[0].categoria;
-        autoSubcategoria = autoSubcategoria || semanaResult.rows[0].subcategoria;
       }
     }
 
@@ -286,7 +267,7 @@ app.put("/noticias/:id", async (req, res) => {
       updates.push(`avaliacao = $${paramIndex}`);
       values.push(avaliacao);
       paramIndex++;
-      updates.push(`pontos = $${paramIndex}`);
+      updates.push(`pontos_new = $${paramIndex}`);
       values.push(pontosNew);
       paramIndex++;
     }
@@ -303,15 +284,15 @@ app.put("/noticias/:id", async (req, res) => {
       paramIndex++;
     }
 
-    if (autoCategoria !== undefined) {
+    if (categoria !== undefined) {
       updates.push(`categoria = $${paramIndex}`);
-      values.push(autoCategoria);
+      values.push(categoria);
       paramIndex++;
     }
 
-    if (autoSubcategoria !== undefined) {
+    if (subcategoria !== undefined) {
       updates.push(`subcategoria = $${paramIndex}`);
-      values.push(autoSubcategoria);
+      values.push(subcategoria);
       paramIndex++;
     }
 
@@ -324,14 +305,12 @@ app.put("/noticias/:id", async (req, res) => {
       RETURNING *
     `;
 
-    const result = await client.query(query, values);
+    const result = await pool.query(query, values);
 
     res.json(result.rows[0]);
   } catch (error) {
     console.error("Erro ao atualizar a notícia:", error.message);
     res.status(500).json({ error: error.message });
-  } finally {
-    if (client) client.release();
   }
 });
 
