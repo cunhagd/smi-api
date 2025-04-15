@@ -31,3 +31,5 @@ Thumbs.db  # Windows
 
 # Arquivos de testes ou cobertura
 coverage/
+
+back.js

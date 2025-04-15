@@ -214,31 +214,30 @@ app.get("/noticias", async (req, res) => {
 // Rota para atualizar notícias (unificada)
 app.put("/noticias/:id", async (req, res) => {
   const { id } = req.params;
-  const { estrategica, relevancia, ...otherFields } = req.body;
+  const { estrategica, relevancia, avaliacao, ...otherFields } = req.body;
 
   let client;
   try {
     client = await pool.connect();
+    await client.query('BEGIN'); // Inicia uma transação
 
-    // Log para depuração
-    console.log(`Recebendo requisição para atualizar notícia ID ${id}:`, { estrategica, relevancia, otherFields });
+    console.log(`Recebendo requisição para atualizar notícia ID ${id}:`, { estrategica, relevancia, avaliacao, otherFields });
 
     // Se a notícia estiver sendo marcada como estratégica
     if (estrategica === true) {
-      // Primeiro, obter a data da notícia
       const noticiaResult = await client.query(
         `SELECT data FROM noticias WHERE id = $1`,
         [id]
       );
 
       if (noticiaResult.rows.length === 0) {
+        await client.query('ROLLBACK');
         return res.status(404).json({ error: "Notícia não encontrada" });
       }
 
-      const dataNoticia = noticiaResult.rows[0].data; // Formato DD/MM/YYYY
+      const dataNoticia = noticiaResult.rows[0].data;
       console.log(`Notícia ID ${id} com data ${dataNoticia} marcada como estratégica`);
 
-      // Buscar semana estratégica que contém essa data
       const semanaResult = await client.query(
         `SELECT categoria, subcategoria FROM semana_estrategica 
          WHERE TO_DATE($1, 'DD/MM/YYYY') BETWEEN 
@@ -246,12 +245,10 @@ app.put("/noticias/:id", async (req, res) => {
         [dataNoticia]
       );
 
-      // Se encontrou uma semana estratégica para esta data
       if (semanaResult.rows.length > 0) {
         const { categoria, subcategoria } = semanaResult.rows[0];
         console.log(`Semana estratégica encontrada para a data ${dataNoticia}: categoria=${categoria}, subcategoria=${subcategoria}`);
 
-        // Atualizar a notícia com a categoria e subcategoria da semana estratégica
         const updateResult = await client.query(
           `UPDATE noticias 
            SET estrategica = $1, categoria = $2, subcategoria = $3
@@ -261,29 +258,28 @@ app.put("/noticias/:id", async (req, res) => {
         );
 
         console.log(`Notícia ID ${id} atualizada com sucesso:`, updateResult.rows[0]);
-        return res.json(updateResult.rows[0]);
+        // Após atualizar, ajustaremos pontos_new abaixo
       } else {
         console.log(`Nenhuma semana estratégica encontrada para a data ${dataNoticia}`);
       }
     }
 
-    // Caso não seja estratégica ou não encontre semana correspondente, faz a atualização normal
-    const fields = { estrategica, relevancia, ...otherFields };
-    const keys = Object.keys(fields).filter(key => fields[key] !== undefined); // Ignorar campos undefined
+    // Atualização normal dos outros campos
+    const fields = { estrategica, relevancia, avaliacao, ...otherFields };
+    const keys = Object.keys(fields).filter(key => fields[key] !== undefined);
 
     if (keys.length === 0) {
+      await client.query('ROLLBACK');
       return res.status(400).json({ error: "Nenhum campo válido para atualização" });
     }
 
-    // Construir a query dinamicamente, tratando valores null explicitamente
     const setClauses = keys.map((key, i) => {
       if (fields[key] === null) {
-        return `${key} = NULL`; // Definir explicitamente como NULL no SQL
+        return `${key} = NULL`;
       }
       return `${key} = $${i + 1}`;
     }).join(', ');
 
-    // Filtrar os valores que não são null para passar como parâmetros
     const values = keys
       .filter(key => fields[key] !== null)
       .map(key => fields[key]);
@@ -298,8 +294,44 @@ app.put("/noticias/:id", async (req, res) => {
     const result = await client.query(query, [...values, id]);
     console.log(`Notícia ID ${id} atualizada (atualização normal):`, result.rows[0]);
 
-    res.json(result.rows[0]);
+    // Após atualizar os campos, ajustamos a coluna pontos_new
+    const updatedNoticia = result.rows[0];
+    const pontos = updatedNoticia.pontos || 0;
+    const avaliacaoAtual = updatedNoticia.avaliacao;
+
+    let pontosNew = null;
+    if (avaliacaoAtual === null) {
+      pontosNew = null; // Se avaliacao for null, pontos_new deve ser null
+    } else if (avaliacaoAtual === 'Negativa') {
+      pontosNew = -Math.abs(pontos); // Se avaliacao for Negativa, pontos_new é o valor negativo
+    } else if (avaliacaoAtual === 'Positiva' || avaliacaoAtual === 'Neutra') {
+      pontosNew = pontos; // Se avaliacao for Positiva ou Neutra, pontos_new é igual a pontos
+    }
+
+    // Atualiza a coluna pontos_new
+    await client.query(
+      `
+        UPDATE noticias
+        SET pontos_new = $1
+        WHERE id = $2
+      `,
+      [pontosNew, id]
+    );
+
+    console.log(`Coluna pontos_new atualizada para notícia ID ${id}: pontos_new = ${pontosNew}`);
+
+    // Atualiza o objeto de resposta para incluir pontos_new
+    const finalResult = await client.query(
+      `
+        SELECT * FROM noticias WHERE id = $1
+      `,
+      [id]
+    );
+
+    await client.query('COMMIT');
+    res.json(finalResult.rows[0]);
   } catch (error) {
+    await client.query('ROLLBACK');
     console.error("Erro ao atualizar notícia:", error.message);
     res.status(500).json({ error: error.message });
   } finally {
