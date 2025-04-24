@@ -304,8 +304,11 @@ app.put("/noticias/:id", async (req, res) => {
       pontosNew = null; // Se avaliacao for null, pontos_new deve ser null
     } else if (avaliacaoAtual === 'Negativa') {
       pontosNew = -Math.abs(pontos); // Se avaliacao for Negativa, pontos_new é o valor negativo
-    } else if (avaliacaoAtual === 'Positiva' || avaliacaoAtual === 'Neutra') {
-      pontosNew = pontos; // Se avaliacao for Positiva ou Neutra, pontos_new é igual a pontos
+    } else if (avaliacaoAtual === 'Positiva') {
+      pontosNew = pontos; // Se avaliacao for Positiva, pontos_new é igual a pontos
+    }
+      else if (avaliacaoAtual === 'Neutra') {
+      pontosNew = 0; // Se a avaliação for Neutra, pontos_new é igual a 0
     }
 
     // Atualiza a coluna pontos_new
