@@ -13,12 +13,13 @@ import { SemanaEstrategica } from './modules/semana-estrategica/entities/semana-
       imports: [ConfigModule],
       useFactory: (configService: ConfigService) => {
         const databaseUrl: string = configService.get<string>('DATABASE_URL')!;
+        console.log('DATABASE_URL:', databaseUrl); // Adiciona log para depuração
         return {
           type: 'postgres',
           url: databaseUrl,
           entities: [Noticia, SemanaEstrategica],
           synchronize: false,
-          logging: true, // Ativa logs para depuração no Railway
+          logging: true,
         };
       },
       inject: [ConfigService],
