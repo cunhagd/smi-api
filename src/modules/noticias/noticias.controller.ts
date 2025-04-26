@@ -1,0 +1,100 @@
+import {
+    Controller,
+    Get,
+    Put,
+    Param,
+    Body,
+    Query,
+    UsePipes,
+    ValidationPipe,
+    ParseIntPipe,
+  } from '@nestjs/common';
+  import { NoticiasService } from './noticias.service';
+  import { FilterNoticiasDto } from './dto/filter-noticias.dto';
+  import { UpdateNoticiaDto } from './dto/update-noticia.dto';
+  import {
+    ApiOperation,
+    ApiQuery,
+    ApiResponse,
+    ApiTags,
+    ApiParam,
+    ApiBody,
+  } from '@nestjs/swagger';
+  import { Noticia } from './entities/noticia.entity';
+  
+  @ApiTags('noticias')
+  @Controller('noticias')
+  export class NoticiasController {
+    constructor(private readonly noticiasService: NoticiasService) {}
+  
+    @Get()
+    @UsePipes(new ValidationPipe({ transform: true }))
+    @ApiOperation({ summary: 'Listar notícias com paginação por dia' })
+    @ApiQuery({
+      name: 'from',
+      required: false,
+      type: String,
+      example: '2025-04-10',
+    })
+    @ApiQuery({
+      name: 'to',
+      required: false,
+      type: String,
+      example: '2025-04-15',
+    })
+    @ApiQuery({
+      name: 'date',
+      required: false,
+      type: String,
+      example: '2025-04-15',
+    })
+    @ApiQuery({
+      name: 'utilidade',
+      required: false,
+      type: String,
+      example: 'Neutro',
+    })
+    @ApiQuery({
+      name: 'estrategica',
+      required: false,
+      type: Boolean,
+      example: true,
+    })
+    @ApiQuery({
+      name: 'avaliacao',
+      required: false,
+      type: String,
+      example: 'Positiva',
+    })
+    @ApiQuery({ name: 'tema', required: false, type: String, example: 'Social' })
+    @ApiQuery({ name: 'titulo', required: false, type: String, example: 'Minas' })
+    @ApiQuery({
+      name: 'portal',
+      required: false,
+      type: String,
+      example: 'Divinews',
+    })
+    @ApiResponse({
+      status: 200,
+      description: 'Lista de notícias',
+      type: [Noticia],
+    })
+    async findAll(@Query() filterDto: FilterNoticiasDto) {
+      return this.noticiasService.findAll(filterDto);
+    }
+  
+    @Put(':id')
+    @UsePipes(new ValidationPipe({ transform: true }))
+    @ApiOperation({ summary: 'Atualizar uma notícia por ID' })
+    @ApiParam({ name: 'id', type: Number, description: 'ID da notícia' })
+    @ApiBody({ type: UpdateNoticiaDto })
+    @ApiResponse({ status: 200, description: 'Notícia atualizada', type: Noticia })
+    @ApiResponse({ status: 400, description: 'Requisição inválida' })
+    @ApiResponse({ status: 404, description: 'Notícia não encontrada' })
+    async update(
+      @Param('id', ParseIntPipe) id: number,
+      @Body() updateDto: UpdateNoticiaDto,
+    ) {
+      return this.noticiasService.update(id, updateDto);
+    }
+  }
