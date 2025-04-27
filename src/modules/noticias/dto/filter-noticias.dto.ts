@@ -5,18 +5,28 @@ import { Avaliacao } from '../entities/noticia.entity';
 export class FilterNoticiasDto {
   @IsOptional()
   @IsString()
-  @Transform(({ value }) => (value === '' ? value : value))
+  @Transform(({ value }) => (value === '' ? undefined : value))
   from?: string;
 
   @IsOptional()
   @IsString()
-  @Transform(({ value }) => (value === '' ? value : value))
+  @Transform(({ value }) => (value === '' ? undefined : value))
   to?: string;
 
   @IsOptional()
   @IsString()
-  @Transform(({ value }) => (value === '' ? value : value))
+  @Transform(({ value }) => (value === '' ? undefined : value))
   date?: string;
+
+  @IsOptional()
+  @IsString()
+  @Transform(({ value }) => (value === '' ? undefined : value))
+  before?: string;
+
+  @IsOptional()
+  @IsString()
+  @Transform(({ value }) => (value === '' ? undefined : value))
+  after?: string;
 
   @IsOptional()
   @IsString()
@@ -25,7 +35,11 @@ export class FilterNoticiasDto {
 
   @IsOptional()
   @IsBoolean()
-  @Transform(({ value }) => value === 'true' || value === true)
+  @Transform(({ value }) => {
+    if (value === 'true') return true;
+    if (value === 'false') return false;
+    return undefined;
+  })
   estrategica?: boolean;
 
   @IsOptional()
@@ -42,6 +56,6 @@ export class FilterNoticiasDto {
 
   @IsOptional()
   @IsIn([Avaliacao.POSITIVA, Avaliacao.NEGATIVA, Avaliacao.NEUTRA, null, ''])
-  @Transform(({ value }) => (value === '' ? value : value))
-  avaliacao?: Avaliacao | null | '';
+  @Transform(({ value }) => (value === '' ? null : value))
+  avaliacao?: Avaliacao | null;
 }

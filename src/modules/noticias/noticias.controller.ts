@@ -29,30 +29,42 @@ import {
   
     @Get()
     @UsePipes(new ValidationPipe({ transform: true }))
-    @ApiOperation({ summary: 'Listar notícias com paginação por dia' })
+    @ApiOperation({ summary: 'Listar notícias por dia com navegação' })
     @ApiQuery({
       name: 'from',
       required: false,
       type: String,
-      example: '2025-04-10',
+      example: '2025-04-20',
     })
     @ApiQuery({
       name: 'to',
       required: false,
       type: String,
-      example: '2025-04-15',
+      example: '2025-04-25',
     })
     @ApiQuery({
       name: 'date',
       required: false,
       type: String,
-      example: '2025-04-15',
+      example: '2025-04-25',
+    })
+    @ApiQuery({
+      name: 'before',
+      required: false,
+      type: String,
+      example: '2025-04-25',
+    })
+    @ApiQuery({
+      name: 'after',
+      required: false,
+      type: String,
+      example: '2025-04-24',
     })
     @ApiQuery({
       name: 'utilidade',
       required: false,
       type: String,
-      example: 'Neutro',
+      example: 'Util',
     })
     @ApiQuery({
       name: 'estrategica',
@@ -72,7 +84,7 @@ import {
       name: 'portal',
       required: false,
       type: String,
-      example: 'Divinews',
+      example: 'Mauá Agora',
     })
     @ApiResponse({
       status: 200,

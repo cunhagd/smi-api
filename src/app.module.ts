@@ -13,7 +13,6 @@ import { SemanaEstrategica } from './modules/semana-estrategica/entities/semana-
       imports: [ConfigModule],
       useFactory: (configService: ConfigService) => {
         const databaseUrl: string = configService.get<string>('DATABASE_URL')!;
-        console.log('DATABASE_URL:', databaseUrl); // Adiciona log para depuração
         return {
           type: 'postgres',
           url: databaseUrl,
