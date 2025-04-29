@@ -39,6 +39,7 @@ export class NoticiasService {
       portal,
       avaliacao,
     } = filterDto;
+    this.logger.debug(`Valor de estrategica após transformação: ${estrategica}, tipo: ${typeof estrategica}`);
 
     const fromFormatted = from ? this.convertToDDMMYYYY(from) : undefined;
     const toFormatted = to ? this.convertToDDMMYYYY(to) : undefined;
@@ -76,13 +77,6 @@ export class NoticiasService {
     if (avaliacao !== undefined && !validAvaliacoes.includes(avaliacao)) {
       throw new BadRequestException(
         'Avaliação deve ser Positiva, Negativa, Neutra ou nula',
-      );
-    }
-
-    const validRelevancias = ['util', 'lixo', 'suporte', null];
-    if (relevancia !== undefined && !validRelevancias.includes(relevancia)) {
-      throw new BadRequestException(
-        'Relevância deve ser Útil, Lixo, Suporte ou nula',
       );
     }
 
@@ -191,7 +185,9 @@ export class NoticiasService {
       )
       .andWhere(
         estrategica !== undefined
-          ? 'noticia.estrategica = :estrategica'
+          ? estrategica === null
+            ? 'noticia.estrategica IS NULL'
+            : 'noticia.estrategica = :estrategica'
           : 'TRUE',
         { estrategica },
       )
@@ -239,7 +235,9 @@ export class NoticiasService {
       )
       .andWhere(
         estrategica !== undefined
-          ? 'noticia.estrategica = :estrategica'
+          ? estrategica === null
+            ? 'noticia.estrategica IS NULL'
+            : 'noticia.estrategica = :estrategica'
           : 'TRUE',
         { estrategica },
       )

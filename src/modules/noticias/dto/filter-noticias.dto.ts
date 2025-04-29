@@ -30,14 +30,25 @@ export class FilterNoticiasDto {
 
   @IsOptional()
   @IsString()
-  @IsIn(['Útil', 'Lixo', 'Suporte', null])
+  @Transform(({ value }) =>
+    typeof value === 'string' ? value.charAt(0).toUpperCase() + value.slice(1).toLowerCase() : value,
+  )
+  @IsIn(['Útil', 'Lixo', 'Suporte', null], {
+    message: 'Relevância deve ser Útil, Lixo, Suporte ou nula',
+  })
   relevancia?: 'Útil' | 'Lixo' | 'Suporte' | null;
 
   @IsOptional()
   @IsBoolean()
   @Transform(({ value }) => {
-    if (value === 'true') return true;
-    if (value === 'false') return false;
+    console.log(`Valor bruto de estrategica: ${value}, tipo: ${typeof value}`); // Log temporário para depuração
+    if (typeof value === 'string') {
+      const lowerValue = value.toLowerCase();
+      if (lowerValue === 'true') return true;
+      if (lowerValue === 'false') return false;
+    } else if (typeof value === 'boolean') {
+      return value; // Aceita true/false diretamente
+    }
     return undefined;
   })
   estrategica?: boolean;
