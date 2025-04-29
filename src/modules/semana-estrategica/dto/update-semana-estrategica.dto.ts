@@ -23,7 +23,7 @@ import {
   
     @IsOptional()
     @IsString()
-    @IsIn(['Educação', 'Gestão', 'Infraestrutura', 'Saúde'])
+    @IsIn(['Educação', 'Social', 'Infraestrutura', 'Saúde'])
     categoria?: string;
   
     @IsOptional()
