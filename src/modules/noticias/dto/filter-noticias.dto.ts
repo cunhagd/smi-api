@@ -30,8 +30,8 @@ export class FilterNoticiasDto {
 
   @IsOptional()
   @IsString()
-  @IsIn(['util', 'lixo', 'suporte'])
-  relevancia?: 'Útil' | 'Lixo' | 'Suporte';
+  @IsIn(['Útil', 'Lixo', 'Suporte', null])
+  relevancia?: 'Útil' | 'Lixo' | 'Suporte' | null;
 
   @IsOptional()
   @IsBoolean()
@@ -55,7 +55,7 @@ export class FilterNoticiasDto {
   portal?: string;
 
   @IsOptional()
-  @IsIn([Avaliacao.POSITIVA, Avaliacao.NEGATIVA, Avaliacao.NEUTRA, null, ''])
+  @IsIn([Avaliacao.POSITIVA, Avaliacao.NEGATIVA, Avaliacao.NEUTRA, null])
   @Transform(({ value }) => (value === '' ? null : value))
   avaliacao?: Avaliacao | null;
 }

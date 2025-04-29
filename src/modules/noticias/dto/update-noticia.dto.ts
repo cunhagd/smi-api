@@ -4,7 +4,7 @@ import { Avaliacao } from '../entities/noticia.entity';
 export class UpdateNoticiaDto {
   @IsOptional()
   @IsString()
-  @IsIn(['util', 'lixo', 'suporte', null], {
+  @IsIn(['Útil', 'Lixo', 'Suporte', null], {
     message: 'Relevância deve ser Útil, Lixo, Suporte ou nula',
   })
   relevancia?: string | null;
@@ -36,5 +36,5 @@ export class UpdateNoticiaDto {
 
   @IsOptional()
   @IsBoolean()
-  estrategica?: boolean | null;
+  estrategica?: boolean; // Removido o | null
 }

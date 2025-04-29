@@ -12,7 +12,7 @@ export class Noticia {
   id: number;
 
   @Column({ type: 'text', nullable: true })
-  relevancia: string ;
+  relevancia: string | null;
 
   @Column({ type: 'text' })
   data: string;
@@ -24,10 +24,10 @@ export class Noticia {
   titulo: string;
 
   @Column({ type: 'text', nullable: true })
-  tema: string;
+  tema: string | null;
 
   @Column({ type: 'text', nullable: true })
-  avaliacao: string;
+  avaliacao: string | null;
 
   @Column({ type: 'integer' })
   pontos: number;
@@ -39,7 +39,7 @@ export class Noticia {
   link: string;
 
   @Column({ type: 'text', nullable: true })
-  autor: string;
+  autor: string | null;
 
   @Column({ type: 'integer', default: 0 })
   pontos_new: number;

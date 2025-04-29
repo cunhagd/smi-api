@@ -110,7 +110,9 @@ export class NoticiasService {
         )
         .andWhere(
           relevancia
-            ? 'noticia.relevancia = :relevancia'
+            ? relevancia === null
+              ? 'noticia.relevancia IS NULL'
+              : 'noticia.relevancia = :relevancia'
             : 'TRUE',
           { relevancia },
         )
@@ -181,7 +183,9 @@ export class NoticiasService {
       .where('noticia.data = :currentDate', { currentDate })
       .andWhere(
         relevancia
-          ? 'noticia.relevancia = :relevancia'
+          ? relevancia === null
+            ? 'noticia.relevancia IS NULL'
+            : 'noticia.relevancia = :relevancia'
           : 'TRUE',
         { relevancia },
       )
@@ -227,7 +231,9 @@ export class NoticiasService {
       )
       .andWhere(
         relevancia
-          ? 'noticia.relevancia = :relevancia'
+          ? relevancia === null
+            ? 'noticia.relevancia IS NULL'
+            : 'noticia.relevancia = :relevancia'
           : 'TRUE',
         { relevancia },
       )
@@ -295,19 +301,19 @@ export class NoticiasService {
 
       const fieldsToUpdate: Partial<Noticia> = {};
       if (updateDto.relevancia !== undefined) {
-        fieldsToUpdate.relevancia = updateDto.relevancia === null ? undefined : updateDto.relevancia;
+        fieldsToUpdate.relevancia = updateDto.relevancia;
       }
       if (updateDto.tema !== undefined) {
-        fieldsToUpdate.tema = updateDto.tema === null ? undefined : updateDto.tema;
+        fieldsToUpdate.tema = updateDto.tema;
       }
       if (updateDto.avaliacao !== undefined) {
-        fieldsToUpdate.avaliacao = updateDto.avaliacao === null ? undefined : updateDto.avaliacao;
+        fieldsToUpdate.avaliacao = updateDto.avaliacao;
       }
       if (updateDto.estrategica !== undefined) {
-        fieldsToUpdate.estrategica = updateDto.estrategica === null ? undefined : updateDto.estrategica;
+        fieldsToUpdate.estrategica = updateDto.estrategica;
         if (fieldsToUpdate.estrategica === false) {
-          fieldsToUpdate.categoria = undefined;
-          fieldsToUpdate.subcategoria = undefined;
+          fieldsToUpdate.categoria = null;
+          fieldsToUpdate.subcategoria = null;
           this.logger.debug('Estratégica definida como false: limpando categoria e subcategoria');
         }
       }
@@ -337,8 +343,8 @@ export class NoticiasService {
             `Semana estratégica encontrada: categoria=${semana.categoria}, subcategoria=${semana.subcategoria}`,
           );
         } else {
-          fieldsToUpdate.categoria = undefined;
-          fieldsToUpdate.subcategoria = undefined;
+          fieldsToUpdate.categoria = null;
+          fieldsToUpdate.subcategoria = null;
           this.logger.debug('Nenhuma semana estratégica encontrada');
         }
       }
