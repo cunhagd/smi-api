@@ -24,6 +24,15 @@ import {
     async findAll() {
       return this.semanaEstrategicaRepository.find();
     }
+
+    async remove(id: number) {
+      const semana = await this.semanaEstrategicaRepository.findOne({ where: { id } });
+      if (!semana) {
+        throw new NotFoundException(`Semana estratégica com ID ${id} não encontrada`);
+      }
+      await this.semanaEstrategicaRepository.delete(id);
+      return { message: `Semana estratégica com ID ${id} excluída com sucesso` };
+    }
   
     async create(createDto: CreateSemanaEstrategicaDto) {
       const queryRunner = this.dataSource.createQueryRunner();

@@ -4,6 +4,7 @@ import {
     Post,
     Put,
     Body,
+    Delete,
     Param,
     UsePipes,
     ValidationPipe,
@@ -37,6 +38,11 @@ import {
     })
     findAll() {
       return this.semanaEstrategicaService.findAll();
+    }
+
+    @Delete(':id')
+    async remove(@Param('id') id: string) {
+      return this.semanaEstrategicaService.remove(+id);
     }
   
     @Post()
