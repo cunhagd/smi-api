@@ -18,7 +18,7 @@ import {
   
     @IsOptional()
     @IsInt()
-    @Min(20)
+    @Min(1)
     ciclo?: number;
   
     @IsOptional()
