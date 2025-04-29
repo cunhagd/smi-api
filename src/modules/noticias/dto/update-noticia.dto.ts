@@ -3,8 +3,11 @@ import { Avaliacao } from '../entities/noticia.entity';
 
 export class UpdateNoticiaDto {
   @IsOptional()
-  @IsBoolean()
-  relevancia?: boolean | null;
+  @IsString()
+  @IsIn(['util', 'lixo', 'suporte', null], {
+    message: 'Relevância deve ser Útil, Lixo, Suporte ou nula',
+  })
+  relevancia?: string | null;
 
   @IsOptional()
   @IsString()
@@ -19,16 +22,19 @@ export class UpdateNoticiaDto {
     'Educação',
     'Economia',
     'Cultura',
-  ])
-  tema?: string;
+    null,
+  ], {
+    message: 'Tema deve ser um dos valores permitidos ou nulo',
+  })
+  tema?: string | null;
 
   @IsOptional()
-  @IsIn([Avaliacao.POSITIVA, Avaliacao.NEGATIVA, Avaliacao.NEUTRA, null, ''], {
-    message: 'Avaliação deve ser Positiva, Negativa, Neutra, nula ou vazia',
+  @IsIn([Avaliacao.POSITIVA, Avaliacao.NEGATIVA, Avaliacao.NEUTRA, null], {
+    message: 'Avaliação deve ser Positiva, Negativa, Neutra ou nula',
   })
-  avaliacao?: Avaliacao | null | '';
+  avaliacao?: Avaliacao | null;
 
   @IsOptional()
   @IsBoolean()
-  estrategica?: boolean;
+  estrategica?: boolean | null;
 }

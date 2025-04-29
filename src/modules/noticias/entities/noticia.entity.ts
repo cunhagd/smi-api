@@ -11,8 +11,8 @@ export class Noticia {
   @PrimaryGeneratedColumn()
   id: number;
 
-  @Column({ type: 'boolean', nullable: true })
-  relevancia: boolean;
+  @Column({ type: 'text', nullable: true })
+  relevancia: string ;
 
   @Column({ type: 'text' })
   data: string;

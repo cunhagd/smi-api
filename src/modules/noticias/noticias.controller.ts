@@ -61,7 +61,7 @@ import {
       example: '2025-04-24',
     })
     @ApiQuery({
-      name: 'utilidade',
+      name: 'relevancia',
       required: false,
       type: String,
       example: 'Util',

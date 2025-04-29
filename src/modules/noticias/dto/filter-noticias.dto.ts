@@ -30,8 +30,8 @@ export class FilterNoticiasDto {
 
   @IsOptional()
   @IsString()
-  @IsIn(['Util', 'Lixo', 'Neutro'])
-  utilidade?: 'Util' | 'Lixo' | 'Neutro';
+  @IsIn(['util', 'lixo', 'suporte'])
+  relevancia?: 'Útil' | 'Lixo' | 'Suporte';
 
   @IsOptional()
   @IsBoolean()
