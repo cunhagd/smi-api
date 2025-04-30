@@ -54,6 +54,20 @@ export class FilterNoticiasDto {
   estrategica?: boolean;
 
   @IsOptional()
+  @IsBoolean()
+  @Transform(({ value }) => {
+    if (typeof value === 'string') {
+      const lowerValue = value.toLowerCase();
+      if (lowerValue === 'true') return true;
+      if (lowerValue === 'false') return false;
+    } else if (typeof value === 'boolean') {
+      return value;
+    }
+    return undefined;
+  })
+  all?: boolean;
+
+  @IsOptional()
   @IsString()
   tema?: string;
 

@@ -73,6 +73,13 @@ import {
       example: true,
     })
     @ApiQuery({
+      name: 'all',
+      required: false,
+      type: Boolean,
+      example: true,
+      description: 'Se true e estrategica=true, retorna todas as notícias estratégicas sem paginação',
+    })
+    @ApiQuery({
       name: 'avaliacao',
       required: false,
       type: String,

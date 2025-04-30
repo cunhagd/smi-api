@@ -34,12 +34,14 @@ export class NoticiasService {
       after,
       relevancia,
       estrategica,
+      all,
       tema,
       titulo,
       portal,
       avaliacao,
     } = filterDto;
     this.logger.debug(`Valor de estrategica após transformação: ${estrategica}, tipo: ${typeof estrategica}`);
+    this.logger.debug(`Valor de all após transformação: ${all}, tipo: ${typeof all}`);
 
     const fromFormatted = from ? this.convertToDDMMYYYY(from) : undefined;
     const toFormatted = to ? this.convertToDDMMYYYY(to) : undefined;
@@ -48,7 +50,7 @@ export class NoticiasService {
     const afterFormatted = after ? this.convertToDDMMYYYY(after) : undefined;
 
     this.logger.debug(
-      `Filtros: from=${fromFormatted}, to=${toFormatted}, date=${dateFormatted}, before=${beforeFormatted}, after=${afterFormatted}, relevancia=${relevancia}, estrategica=${estrategica}, tema=${tema}, titulo=${titulo}, portal=${portal}, avaliacao=${avaliacao}`,
+      `Filtros: from=${fromFormatted}, to=${toFormatted}, date=${dateFormatted}, before=${beforeFormatted}, after=${afterFormatted}, relevancia=${relevancia}, estrategica=${estrategica}, all=${all}, tema=${tema}, titulo=${titulo}, portal=${portal}, avaliacao=${avaliacao}`,
     );
 
     // Validações
@@ -80,7 +82,71 @@ export class NoticiasService {
       );
     }
 
-    // Determina a data atual
+    // Se all=true e estrategica=true, buscar todas as notícias estratégicas sem paginação
+    if (all === true && estrategica === true) {
+      const query = this.noticiaRepository
+        .createQueryBuilder('noticia')
+        .where('noticia.estrategica = :estrategica', { estrategica: true })
+        .andWhere(
+          fromFormatted
+            ? "TO_DATE(noticia.data, 'DD/MM/YYYY') >= TO_DATE(:from, 'DD/MM/YYYY')"
+            : 'TRUE',
+          { from: fromFormatted },
+        )
+        .andWhere(
+          toFormatted
+            ? "TO_DATE(noticia.data, 'DD/MM/YYYY') <= TO_DATE(:to, 'DD/MM/YYYY')"
+            : 'TRUE',
+          { to: toFormatted },
+        )
+        .andWhere(
+          relevancia
+            ? relevancia === null
+              ? 'noticia.relevancia IS NULL'
+              : 'noticia.relevancia = :relevancia'
+            : 'TRUE',
+          { relevancia },
+        )
+        .andWhere(tema ? 'noticia.tema ILIKE :tema' : 'TRUE', { tema })
+        .andWhere(titulo ? 'noticia.titulo ILIKE :titulo' : 'TRUE', {
+          titulo: `%${titulo}%`,
+        })
+        .andWhere(portal ? 'noticia.portal ILIKE :portal' : 'TRUE', { portal })
+        .andWhere(
+          avaliacao !== undefined
+            ? avaliacao === null
+              ? 'noticia.avaliacao IS NULL'
+              : 'noticia.avaliacao = :avaliacao'
+            : 'TRUE',
+          { avaliacao },
+        )
+        .orderBy("TO_DATE(noticia.data, 'DD/MM/YYYY')", 'DESC')
+        .addOrderBy('noticia.id', 'DESC');
+
+      this.logger.debug(`Executando query para all=true: ${query.getSql()}`);
+      const noticias = await query.getMany();
+      this.logger.debug(`Notícias encontradas: ${noticias.length}`);
+
+      const total = noticias.length;
+
+      const noticiasFormatted = noticias.map((noticia) => ({
+        ...noticia,
+        data: noticia.data,
+        avaliacao: noticia.avaliacao === '' ? null : noticia.avaliacao,
+      }));
+
+      return {
+        data: noticiasFormatted,
+        meta: {
+          total,
+          date: null, // Não há data específica, já que estamos retornando todas as notícias
+          hasNext: false,
+          hasPrevious: false,
+        },
+      };
+    }
+
+    // Lógica existente para navegação por data
     let currentDate = dateFormatted;
     let allDates: { noticia_data: string }[] = [];
 
