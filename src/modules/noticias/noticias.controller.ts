@@ -99,7 +99,22 @@ import {
     @UsePipes(new ValidationPipe({ transform: true }))
     @ApiOperation({ summary: 'Atualizar uma notícia por ID' })
     @ApiParam({ name: 'id', type: Number, description: 'ID da notícia' })
-    @ApiBody({ type: UpdateNoticiaDto })
+    @ApiBody({
+      type: UpdateNoticiaDto,
+      examples: {
+        example1: {
+          value: {
+            estrategica: true,
+            relevancia: 'Útil',
+            tema: 'Educação',
+            avaliacao: 'Positiva',
+            categoria: 'Educação',
+            subcategoria: 'Cultura e Turismo',
+            ciclo: 21,
+          },
+        },
+      },
+    })
     @ApiResponse({ status: 200, description: 'Notícia atualizada', type: Noticia })
     @ApiResponse({ status: 400, description: 'Requisição inválida' })
     @ApiResponse({ status: 404, description: 'Notícia não encontrada' })

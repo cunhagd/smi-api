@@ -312,8 +312,18 @@ export class NoticiasService {
         if (fieldsToUpdate.estrategica === false) {
           fieldsToUpdate.categoria = null;
           fieldsToUpdate.subcategoria = null;
-          this.logger.debug('Estratégica definida como false: limpando categoria e subcategoria');
+          fieldsToUpdate.ciclo = null;
+          this.logger.debug('Estratégica definida como false: limpando categoria, subcategoria e ciclo');
         }
+      }
+      if (updateDto.categoria !== undefined && fieldsToUpdate.estrategica !== false) {
+        fieldsToUpdate.categoria = updateDto.categoria;
+      }
+      if (updateDto.subcategoria !== undefined && fieldsToUpdate.estrategica !== false) {
+        fieldsToUpdate.subcategoria = updateDto.subcategoria;
+      }
+      if (updateDto.ciclo !== undefined && fieldsToUpdate.estrategica !== false) {
+        fieldsToUpdate.ciclo = updateDto.ciclo;
       }
 
       this.logger.debug(`Campos a atualizar: ${JSON.stringify(fieldsToUpdate)}`);
@@ -322,29 +332,6 @@ export class NoticiasService {
         throw new BadRequestException(
           'Pelo menos um campo deve ser fornecido para atualização',
         );
-      }
-
-      if (fieldsToUpdate.estrategica === true) {
-        this.logger.debug(`Buscando semana estratégica para data ${noticia.data}`);
-        const semana = await queryRunner.manager
-          .createQueryBuilder(SemanaEstrategica, 'semana')
-          .where(
-            "TO_DATE(:data, 'DD/MM/YYYY') BETWEEN TO_DATE(semana.data_inicial, 'DD/MM/YYYY') AND TO_DATE(semana.data_final, 'DD/MM/YYYY')",
-            { data: noticia.data },
-          )
-          .getOne();
-
-        if (semana) {
-          fieldsToUpdate.categoria = semana.categoria;
-          fieldsToUpdate.subcategoria = semana.subcategoria;
-          this.logger.debug(
-            `Semana estratégica encontrada: categoria=${semana.categoria}, subcategoria=${semana.subcategoria}`,
-          );
-        } else {
-          fieldsToUpdate.categoria = null;
-          fieldsToUpdate.subcategoria = null;
-          this.logger.debug('Nenhuma semana estratégica encontrada');
-        }
       }
 
       this.logger.debug(`Executando atualização com campos: ${JSON.stringify(fieldsToUpdate)}`);

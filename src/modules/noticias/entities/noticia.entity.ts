@@ -49,4 +49,7 @@ export class Noticia {
 
   @Column({ type: 'varchar', length: 250, nullable: true })
   subcategoria: string | null;
+
+  @Column({ type: 'integer' })
+  ciclo: number | null;
 }

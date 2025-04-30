@@ -1,4 +1,4 @@
-import { IsOptional, IsBoolean, IsString, IsIn } from 'class-validator';
+import { IsOptional, IsBoolean, IsString, IsIn, IsInt, MaxLength } from 'class-validator';
 import { Avaliacao } from '../entities/noticia.entity';
 
 export class UpdateNoticiaDto {
@@ -36,5 +36,23 @@ export class UpdateNoticiaDto {
 
   @IsOptional()
   @IsBoolean()
-  estrategica?: boolean; // Removido o | null
+  estrategica?: boolean;
+
+  @IsOptional()
+  @IsString()
+  @IsIn(['Educação', 'Social', 'Infraestrutura', 'Saúde', null], {
+    message: 'Categoria deve ser Educação, Social, Infraestrutura, Saúde ou nula',
+  })
+  categoria?: string | null;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(250, {
+    message: 'Subcategoria não pode exceder 250 caracteres',
+  })
+  subcategoria?: string | null;
+
+  @IsOptional()
+  @IsInt()
+  ciclo?: number | null;
 }
