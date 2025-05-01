@@ -139,7 +139,7 @@ export class NoticiasService {
         data: noticiasFormatted,
         meta: {
           total,
-          date: null, // Não há data específica, já que estamos retornando todas as notícias
+          date: null,
           hasNext: false,
           hasPrevious: false,
         },
@@ -346,6 +346,23 @@ export class NoticiasService {
         hasPrevious: dateFormatted ? false : hasPrevious,
       },
     };
+  }
+
+  async getStrategicDates(): Promise<string[]> {
+    this.logger.debug('Buscando datas com notícias estratégicas');
+
+    const datesQuery = this.noticiaRepository
+      .createQueryBuilder('noticia')
+      .select('noticia.data', 'noticia_data')
+      .where('noticia.estrategica = :estrategica', { estrategica: true })
+      .andWhere('noticia.data IS NOT NULL')
+      .groupBy('noticia.data')
+      .orderBy("TO_DATE(noticia.data, 'DD/MM/YYYY')", 'DESC');
+
+    const result = await datesQuery.getRawMany();
+    this.logger.debug(`Datas estratégicas encontradas: ${JSON.stringify(result)}`);
+
+    return result.map((row) => row.noticia_data);
   }
 
   async update(id: number, updateDto: UpdateNoticiaDto) {
