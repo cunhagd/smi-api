@@ -5,6 +5,7 @@ import { NoticiasModule } from './modules/noticias/noticias.module';
 import { SemanaEstrategicaModule } from './modules/semana-estrategica/semana-estrategica.module';
 import { Noticia } from './modules/noticias/entities/noticia.entity';
 import { SemanaEstrategica } from './modules/semana-estrategica/entities/semana-estrategica.entity';
+import { DashboardModule } from './modules/dashboard/dashboard.module';
 
 @Module({
   imports: [
@@ -25,6 +26,7 @@ import { SemanaEstrategica } from './modules/semana-estrategica/entities/semana-
     }),
     NoticiasModule,
     SemanaEstrategicaModule,
+    DashboardModule
   ],
 })
 export class AppModule {}
