@@ -113,6 +113,17 @@ export class NoticiasController {
     return this.noticiasService.getStrategicDates();
   }
 
+  @Get('trash-dates')
+  @ApiOperation({ summary: 'Listar datas com notícias marcadas como Lixo' })
+  @ApiResponse({
+    status: 200,
+    description: 'Lista de datas no formato DD/MM/YYYY',
+    type: [String],
+  })
+  async getTrashDates() {
+    return this.noticiasService.getTrashDates();
+  }
+
   @Put(':id')
   @UsePipes(new ValidationPipe({ transform: true }))
   @ApiOperation({ summary: 'Atualizar uma notícia por ID' })

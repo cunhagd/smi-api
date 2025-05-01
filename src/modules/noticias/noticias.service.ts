@@ -123,9 +123,71 @@ export class NoticiasService {
         .orderBy("TO_DATE(noticia.data, 'DD/MM/YYYY')", 'DESC')
         .addOrderBy('noticia.id', 'DESC');
 
-      this.logger.debug(`Executando query para all=true: ${query.getSql()}`);
+      this.logger.debug(`Executando query para all=true e estrategica=true: ${query.getSql()}`);
       const noticias = await query.getMany();
-      this.logger.debug(`Notícias encontradas: ${noticias.length}`);
+      this.logger.debug(`Notícias estratégicas encontradas: ${noticias.length}`);
+
+      const total = noticias.length;
+
+      const noticiasFormatted = noticias.map((noticia) => ({
+        ...noticia,
+        data: noticia.data,
+        avaliacao: noticia.avaliacao === '' ? null : noticia.avaliacao,
+      }));
+
+      return {
+        data: noticiasFormatted,
+        meta: {
+          total,
+          date: null,
+          hasNext: false,
+          hasPrevious: false,
+        },
+      };
+    }
+
+    // Se all=true e relevancia='Lixo', buscar todas as notícias marcadas como "Lixo" sem paginação
+    if (all === true && relevancia === 'Lixo') {
+      const query = this.noticiaRepository
+        .createQueryBuilder('noticia')
+        .where('noticia.relevancia = :relevancia', { relevancia: 'Lixo' })
+        .andWhere(
+          fromFormatted
+            ? "TO_DATE(noticia.data, 'DD/MM/YYYY') >= TO_DATE(:from, 'DD/MM/YYYY')"
+            : 'TRUE',
+          { from: fromFormatted },
+        )
+        .andWhere(
+          toFormatted
+            ? "TO_DATE(noticia.data, 'DD/MM/YYYY') <= TO_DATE(:to, 'DD/MM/YYYY')"
+            : 'TRUE',
+          { to: toFormatted },
+        )
+        .andWhere(
+          estrategica !== undefined
+            ? 'noticia.estrategica = :estrategica'
+            : 'TRUE',
+          { estrategica },
+        )
+        .andWhere(tema ? 'noticia.tema ILIKE :tema' : 'TRUE', { tema })
+        .andWhere(titulo ? 'noticia.titulo ILIKE :titulo' : 'TRUE', {
+          titulo: `%${titulo}%`,
+        })
+        .andWhere(portal ? 'noticia.portal ILIKE :portal' : 'TRUE', { portal })
+        .andWhere(
+          avaliacao !== undefined
+            ? avaliacao === null
+              ? 'noticia.avaliacao IS NULL'
+              : 'noticia.avaliacao = :avaliacao'
+            : 'TRUE',
+          { avaliacao },
+        )
+        .orderBy("TO_DATE(noticia.data, 'DD/MM/YYYY')", 'DESC')
+        .addOrderBy('noticia.id', 'DESC');
+
+      this.logger.debug(`Executando query para all=true e relevancia='Lixo': ${query.getSql()}`);
+      const noticias = await query.getMany();
+      this.logger.debug(`Notícias na lixeira encontradas: ${noticias.length}`);
 
       const total = noticias.length;
 
@@ -361,6 +423,23 @@ export class NoticiasService {
 
     const result = await datesQuery.getRawMany();
     this.logger.debug(`Datas estratégicas encontradas: ${JSON.stringify(result)}`);
+
+    return result.map((row) => row.noticia_data);
+  }
+
+  async getTrashDates(): Promise<string[]> {
+    this.logger.debug('Buscando datas com notícias marcadas como Lixo');
+
+    const datesQuery = this.noticiaRepository
+      .createQueryBuilder('noticia')
+      .select('noticia.data', 'noticia_data')
+      .where('noticia.relevancia = :relevancia', { relevancia: 'Lixo' })
+      .andWhere('noticia.data IS NOT NULL')
+      .groupBy('noticia.data')
+      .orderBy("TO_DATE(noticia.data, 'DD/MM/YYYY')", 'DESC');
+
+    const result = await datesQuery.getRawMany();
+    this.logger.debug(`Datas com notícias na lixeira encontradas: ${JSON.stringify(result)}`);
 
     return result.map((row) => row.noticia_data);
   }
