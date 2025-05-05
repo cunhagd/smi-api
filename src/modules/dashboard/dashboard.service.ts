@@ -2,7 +2,7 @@ import { Injectable, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Noticia } from '../noticias/entities/noticia.entity';
-import { DashboardFilterDto, DashboardResponseDto } from './dto/dashboard.dto';
+import { DashboardFilterDto, DashboardResponseDto, PortalItem } from './dto/dashboard.dto';
 import * as moment from 'moment';
 
 // Interfaces para tipagem
@@ -14,11 +14,6 @@ interface NoticiaDataItem {
   negativas: number;
   neutras: number;
   avaliacoes?: Set<string>;
-}
-
-interface PortalItem {
-  portal: string;
-  quantidade: number;
 }
 
 @Injectable()
@@ -217,7 +212,42 @@ export class DashboardService {
         neutras: item.neutras,
       }));
 
-    // Agrupa notícias por portal e ordena por quantidade
+    return {
+      totalNoticias,
+      totalNoticiasPositivas,
+      totalNoticiasNegativas,
+      noticiasPorPeriodo,
+      pontuacaoPorPeriodo,
+      evolucaoNoticiasPorPeriodo: noticiasPorPeriodo,
+      sentimentoNoticiasPorPeriodo,
+    } as DashboardResponseDto;
+  }
+
+  async getPortaisRelevantesPositivas(filter: DashboardFilterDto): Promise<PortalItem[]> {
+    const { dataInicio, dataFim } = filter;
+
+    console.log('Iniciando consulta de portais relevantes positivos com filtros:', {
+      dataInicio,
+      dataFim,
+    });
+
+    // Cria a query base
+    let queryBuilder = this.noticiaRepository.createQueryBuilder('noticia');
+
+    // Aplica o filtro de data
+    queryBuilder = this.applyDateFilter(queryBuilder, dataInicio, dataFim);
+
+    // Filtra apenas notícias positivas
+    queryBuilder = queryBuilder.andWhere('noticia.avaliacao = :avaliacao', { avaliacao: 'Positiva' });
+
+    // Log da query SQL gerada
+    const sql = queryBuilder.getSql();
+    console.log('Query SQL gerada para portais positivos:', sql);
+
+    const noticias = await queryBuilder.getMany();
+    console.log(`Total de notícias positivas encontradas: ${noticias.length}`);
+
+    // Agrupa notícias por portal e soma pontos_new
     const portalMap: Record<string, PortalItem> = noticias.reduce(
       (acc, noticia) => {
         if (!noticia.portal) return acc;
@@ -226,29 +256,68 @@ export class DashboardService {
         if (!portalNome) return acc;
 
         if (!acc[portalNome]) {
-          acc[portalNome] = { portal: portalNome, quantidade: 0 };
+          acc[portalNome] = { portal: portalNome, pontuacao: 0 };
         }
-        acc[portalNome].quantidade += 1;
+        acc[portalNome].pontuacao += noticia.pontos_new || 0;
         return acc;
       },
       {} as Record<string, PortalItem>,
     );
 
-    const portaisRelevantes = Object.values(portalMap)
-      .sort((a: PortalItem, b: PortalItem) => b.quantidade - a.quantidade)
-      .slice(0, 10) as { portal: string; quantidade: number }[];
+    const portaisRelevantesPositivas = Object.values(portalMap)
+      .sort((a: PortalItem, b: PortalItem) => b.pontuacao - a.pontuacao)
+      .slice(0, 5);
 
-    console.log(`Total de portais relevantes: ${portaisRelevantes.length}`);
+    console.log(`Total de portais relevantes positivos: ${portaisRelevantesPositivas.length}`);
+    return portaisRelevantesPositivas;
+  }
 
-    return {
-      totalNoticias,
-      totalNoticiasPositivas,
-      totalNoticiasNegativas,
-      noticiasPorPeriodo,
-      pontuacaoPorPeriodo,
-      portaisRelevantes,
-      evolucaoNoticiasPorPeriodo: noticiasPorPeriodo,
-      sentimentoNoticiasPorPeriodo,
-    } as DashboardResponseDto;
+  async getPortaisRelevantesNegativas(filter: DashboardFilterDto): Promise<PortalItem[]> {
+    const { dataInicio, dataFim } = filter;
+
+    console.log('Iniciando consulta de portais relevantes negativos com filtros:', {
+      dataInicio,
+      dataFim,
+    });
+
+    // Cria a query base
+    let queryBuilder = this.noticiaRepository.createQueryBuilder('noticia');
+
+    // Aplica o filtro de data
+    queryBuilder = this.applyDateFilter(queryBuilder, dataInicio, dataFim);
+
+    // Filtra apenas notícias negativas
+    queryBuilder = queryBuilder.andWhere('noticia.avaliacao = :avaliacao', { avaliacao: 'Negativa' });
+
+    // Log da query SQL gerada
+    const sql = queryBuilder.getSql();
+    console.log('Query SQL gerada para portais negativos:', sql);
+
+    const noticias = await queryBuilder.getMany();
+    console.log(`Total de notícias negativas encontradas: ${noticias.length}`);
+
+    // Agrupa notícias por portal e soma pontos_new
+    const portalMap: Record<string, PortalItem> = noticias.reduce(
+      (acc, noticia) => {
+        if (!noticia.portal) return acc;
+
+        const portalNome = noticia.portal.trim();
+        if (!portalNome) return acc;
+
+        if (!acc[portalNome]) {
+          acc[portalNome] = { portal: portalNome, pontuacao: 0 };
+        }
+        acc[portalNome].pontuacao += noticia.pontos_new || 0;
+        return acc;
+      },
+      {} as Record<string, PortalItem>,
+    );
+
+    const portaisRelevantesNegativas = Object.values(portalMap)
+      .sort((a: PortalItem, b: PortalItem) => b.pontuacao - a.pontuacao)
+      .slice(0, 5);
+
+    console.log(`Total de portais relevantes negativos: ${portaisRelevantesNegativas.length}`);
+    return portaisRelevantesNegativas;
   }
 }

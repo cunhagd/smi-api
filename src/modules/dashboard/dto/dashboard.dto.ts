@@ -1,13 +1,18 @@
-import { IsDateString, IsOptional } from 'class-validator';
+import { IsOptional, IsString } from 'class-validator';
 
 export class DashboardFilterDto {
-  @IsDateString()
   @IsOptional()
+  @IsString()
   dataInicio?: string;
 
-  @IsDateString()
   @IsOptional()
+  @IsString()
   dataFim?: string;
+}
+
+export class PortalItem {
+  portal: string;
+  pontuacao: number;
 }
 
 export class DashboardResponseDto {
@@ -16,7 +21,6 @@ export class DashboardResponseDto {
   totalNoticiasNegativas: number;
   noticiasPorPeriodo: { data: string; quantidade: number }[];
   pontuacaoPorPeriodo: { data: string; pontuacao: number }[];
-  portaisRelevantes: { portal: string; quantidade: number }[];
   evolucaoNoticiasPorPeriodo: { data: string; quantidade: number }[];
   sentimentoNoticiasPorPeriodo: { data: string; positivas: number; negativas: number; neutras: number }[];
 }
