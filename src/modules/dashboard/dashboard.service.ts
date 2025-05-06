@@ -164,7 +164,7 @@ export class DashboardService {
           acc[data] = { data, quantidade: 0, pontuacao: 0, positivas: 0, negativas: 0, neutras: 0, avaliacoes: new Set() };
         }
         acc[data].quantidade += 1;
-        acc[data].pontuacao += noticia.pontos || 0;
+        acc[data].pontuacao += noticia.pontos_new || 0;
 
         // Conta sentimentos com normalização de avaliacao
         const avaliacao = noticia.avaliacao ? noticia.avaliacao.trim() : null;
