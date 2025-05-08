@@ -640,7 +640,7 @@ if (all === true && relevancia === 'Útil') {
 
       if (Object.keys(fieldsToUpdate).length === 0) {
         throw new BadRequestException(
-          'Pelo menos um campo deve ser fornecido para atualização',
+          'Pelo menos um campo deve ser fornecido para atualização.',
         );
       }
 
