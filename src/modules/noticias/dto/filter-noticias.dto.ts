@@ -29,10 +29,14 @@ export class FilterNoticiasDto {
   after?: string;
 
   @IsOptional()
-  @IsString()
-  @Transform(({ value }) =>
-    typeof value === 'string' ? value.charAt(0).toUpperCase() + value.slice(1).toLowerCase() : value,
-  )
+  @Transform(({ value }) => {
+    if (value === 'null' || value === '') return null;
+    if (typeof value === 'string') {
+      const formattedValue = value.charAt(0).toUpperCase() + value.slice(1).toLowerCase();
+      return ['Útil', 'Lixo', 'Suporte'].includes(formattedValue) ? formattedValue : undefined;
+    }
+    return value;
+  })
   @IsIn(['Útil', 'Lixo', 'Suporte', null], {
     message: 'Relevância deve ser Útil, Lixo, Suporte ou null',
   })
