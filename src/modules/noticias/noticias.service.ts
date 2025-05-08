@@ -271,6 +271,68 @@ export class NoticiasService {
       };
     }
 
+// Se all=true e relevancia='Útil', buscar todas as notícias marcadas como "Suporte" sem paginação
+if (all === true && relevancia === 'Útil') {
+  const query = this.noticiaRepository
+    .createQueryBuilder('noticia')
+    .where('noticia.relevancia = :relevancia', { relevancia: 'Útil' })
+    .andWhere(
+      fromFormatted
+        ? "TO_DATE(noticia.data, 'DD/MM/YYYY') >= TO_DATE(:from, 'DD/MM/YYYY')"
+        : 'TRUE',
+      { from: fromFormatted },
+    )
+    .andWhere(
+      toFormatted
+        ? "TO_DATE(noticia.data, 'DD/MM/YYYY') <= TO_DATE(:to, 'DD/MM/YYYY')"
+        : 'TRUE',
+      { to: toFormatted },
+    )
+    .andWhere(
+      estrategica !== undefined
+        ? 'noticia.estrategica = :estrategica'
+        : 'TRUE',
+      { estrategica },
+    )
+    .andWhere(tema ? 'noticia.tema ILIKE :tema' : 'TRUE', { tema })
+    .andWhere(titulo ? 'noticia.titulo ILIKE :titulo' : 'TRUE', {
+      titulo: `%${titulo}%`,
+    })
+    .andWhere(portal ? 'noticia.portal ILIKE :portal' : 'TRUE', { portal })
+    .andWhere(
+      avaliacao !== undefined
+        ? avaliacao === null
+          ? 'noticia.avaliacao IS NULL'
+          : 'noticia.avaliacao = :avaliacao'
+        : 'TRUE',
+      { avaliacao },
+    )
+    .orderBy("TO_DATE(noticia.data, 'DD/MM/YYYY')", 'DESC')
+    .addOrderBy('noticia.id', 'DESC');
+
+  this.logger.debug(`Executando query para all=true e relevancia='Útil': ${query.getSql()}`);
+  const noticias = await query.getMany();
+  this.logger.debug(`Notícias úteis encontradas: ${noticias.length}`);
+
+  const total = noticias.length;
+
+  const noticiasFormatted = noticias.map((noticia) => ({
+    ...noticia,
+    data: noticia.data,
+    avaliacao: noticia.avaliacao === '' ? null : noticia.avaliacao,
+  }));
+
+  return {
+    data: noticiasFormatted,
+    meta: {
+      total,
+      date: null,
+      hasNext: false,
+      hasPrevious: false,
+    },
+  };
+}
+
     // Lógica existente para navegação por data
     let currentDate = dateFormatted;
     let allDates: { noticia_data: string }[] = [];
@@ -492,36 +554,42 @@ export class NoticiasService {
 
   async getTrashDates(): Promise<string[]> {
     this.logger.debug('Buscando datas com notícias marcadas como Lixo');
-
-    const datesQuery = this.noticiaRepository
-      .createQueryBuilder('noticia')
-      .select('noticia.data', 'noticia_data')
-      .where('noticia.relevancia = :relevancia', { relevancia: 'Lixo' })
-      .andWhere('noticia.data IS NOT NULL')
-      .groupBy('noticia.data')
-      .orderBy("TO_DATE(noticia.data, 'DD/MM/YYYY')", 'DESC');
-
-    const result = await datesQuery.getRawMany();
-    this.logger.debug(`Datas com notícias na lixeira encontradas: ${JSON.stringify(result)}`);
-
-    return result.map((row) => row.noticia_data);
+    try {
+      const datesQuery = this.noticiaRepository
+        .createQueryBuilder('noticia')
+        .select('noticia.data', 'noticia_data')
+        .where('noticia.relevancia = :relevancia', { relevancia: 'Lixo' })
+        .andWhere('noticia.data IS NOT NULL')
+        .groupBy('noticia.data')
+        .orderBy("TO_DATE(noticia.data, 'DD/MM/YYYY')", 'DESC');
+  
+      const result = await datesQuery.getRawMany();
+      this.logger.debug(`Datas com notícias na lixeira encontradas: ${JSON.stringify(result)}`);
+      return result.map((row) => row.noticia_data);
+    } catch (error) {
+      this.logger.error(`Erro ao buscar datas de notícias na lixeira: ${error.message}`, error.stack);
+      throw new HttpException(`Erro ao buscar datas de notícias na lixeira: ${error.message}`, 500);
+    }
   }
-
+  
   async getSuportDates(): Promise<string[]> {
     this.logger.debug('Buscando datas com notícias marcadas como Suporte');
-
-    const datesQuery = this.noticiaRepository
-      .createQueryBuilder('noticia')
-      .select('noticia.data', 'noticia_data')
-      .where('noticia.relevancia = :relevancia', { relevancia: 'Suporte' })
-      .andWhere('noticia.data IS NOT NULL')
-      .groupBy('noticia.data')
-      .orderBy("TO_DATE(noticia.data, 'DD/MM/YYYY')", 'DESC');
-
-    const result = await datesQuery.getRawMany();
-    this.logger.debug(`Datas com notícias de suporte encontradas: ${JSON.stringify(result)}`);
-
-    return result.map((row) => row.noticia_data);
+    try {
+      const datesQuery = this.noticiaRepository
+        .createQueryBuilder('noticia')
+        .select('noticia.data', 'noticia_data')
+        .where('noticia.relevancia = :relevancia', { relevancia: 'Suporte' })
+        .andWhere('noticia.data IS NOT NULL')
+        .groupBy('noticia.data')
+        .orderBy("TO_DATE(noticia.data, 'DD/MM/YYYY')", 'DESC');
+  
+      const result = await datesQuery.getRawMany();
+      this.logger.debug(`Datas com notícias de suporte encontradas: ${JSON.stringify(result)}`);
+      return result.map((row) => row.noticia_data);
+    } catch (error) {
+      this.logger.error(`Erro ao buscar datas de notícias de suporte: ${error.message}`, error.stack);
+      throw new HttpException(`Erro ao buscar datas de notícias de suporte: ${error.message}`, 500);
+    }
   }
 
   async update(id: number, updateDto: UpdateNoticiaDto) {

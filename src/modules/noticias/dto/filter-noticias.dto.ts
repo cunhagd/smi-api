@@ -34,7 +34,7 @@ export class FilterNoticiasDto {
     typeof value === 'string' ? value.charAt(0).toUpperCase() + value.slice(1).toLowerCase() : value,
   )
   @IsIn(['Útil', 'Lixo', 'Suporte', null], {
-    message: 'Relevância deve ser Útil, Lixo, Suporte ou nula',
+    message: 'Relevância deve ser Útil, Lixo, Suporte ou null',
   })
   relevancia?: 'Útil' | 'Lixo' | 'Suporte' | null;
 

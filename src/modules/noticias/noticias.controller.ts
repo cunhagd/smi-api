@@ -135,6 +135,17 @@ export class NoticiasController {
     return this.noticiasService.getSuportDates();
   }
 
+  @Get('util-dates')
+  @ApiOperation({ summary: 'Listar datas com notícias marcadas como Útil' })
+  @ApiResponse({
+    status: 200,
+    description: 'Lista de datas no formato DD/MM/YYYY',
+    type: [String],
+  })
+  async getUtiltDates() {
+    return this.noticiasService.getSuportDates();
+  }
+
   @Put(':id')
   @UsePipes(new ValidationPipe({ transform: true }))
   @ApiOperation({ summary: 'Atualizar uma notícia por ID' })
