@@ -150,6 +150,7 @@ export class DashboardService {
 
     const totalNoticiasPositivas = noticiasPositivas.length;
     const totalNoticiasNegativas = noticiasNegativas.length;
+    const totalNoticiasNeutras = noticiasNeutras.length;
 
     // Agrupa notícias por data
     const noticiasPorData: Record<string, NoticiaDataItem> = noticias.reduce(
@@ -216,6 +217,7 @@ export class DashboardService {
       totalNoticias,
       totalNoticiasPositivas,
       totalNoticiasNegativas,
+      totalNoticiasNeutras,
       noticiasPorPeriodo,
       pontuacaoPorPeriodo,
       evolucaoNoticiasPorPeriodo: noticiasPorPeriodo,

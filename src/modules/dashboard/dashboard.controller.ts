@@ -61,6 +61,16 @@ export class DashboardController {
     return { total: dashboardData.totalNoticiasPositivas };
   }
 
+  @Get('noticias-neutras')
+  @ApiOperation({ summary: 'Obtém total de notícias neutras no período' })
+  @ApiQuery({ name: 'dataInicio', required: false, type: String, description: 'Data inicial (YYYY-MM-DD)' })
+  @ApiQuery({ name: 'dataFim', required: false, type: String, description: 'Data final (YYYY-MM-DD)' })
+  @ApiResponse({ status: 200, description: 'Total de notícias neutras', type: TotalResponseDto })
+  async getNoticiasNeutras(@Query() filter: DashboardFilterDto): Promise<TotalResponseDto> {
+    const dashboardData = await this.dashboardService.getDashboardData(filter);
+    return { total: dashboardData.totalNoticiasNeutras };
+  }
+
   @Get('noticias-negativas')
   @ApiOperation({ summary: 'Obtém total de notícias negativas no período' })
   @ApiQuery({ name: 'dataInicio', required: false, type: String, description: 'Data inicial (YYYY-MM-DD)' })

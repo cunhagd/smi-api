@@ -19,6 +19,7 @@ export class DashboardResponseDto {
   totalNoticias: number;
   totalNoticiasPositivas: number;
   totalNoticiasNegativas: number;
+  totalNoticiasNeutras: number;
   noticiasPorPeriodo: { data: string; quantidade: number }[];
   pontuacaoPorPeriodo: { data: string; pontuacao: number }[];
   evolucaoNoticiasPorPeriodo: { data: string; quantidade: number }[];
