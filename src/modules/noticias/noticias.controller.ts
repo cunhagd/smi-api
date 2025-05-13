@@ -102,6 +102,17 @@ export class NoticiasController {
     return this.noticiasService.findAll(filterDto);
   }
 
+  @Get('move-to-trash')
+  @ApiOperation({ summary: 'Mover notícias marcadas como Lixo para a tabela lixeira' })
+  @ApiResponse({
+    status: 200,
+    description: 'Notícias marcadas como Lixo movidas com sucesso',
+    type: Object,
+  })
+  async moveToTrash() {
+    return this.noticiasService.moveToTrash();
+  }
+
   @Get('strategic-dates')
   @ApiOperation({ summary: 'Listar datas com notícias estratégicas' })
   @ApiResponse({

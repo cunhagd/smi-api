@@ -4,6 +4,7 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { NoticiasModule } from './modules/noticias/noticias.module';
 import { SemanaEstrategicaModule } from './modules/semana-estrategica/semana-estrategica.module';
 import { Noticia } from './modules/noticias/entities/noticia.entity';
+import { Lixeira } from './modules/noticias/entities/lixeira.entity';
 import { SemanaEstrategica } from './modules/semana-estrategica/entities/semana-estrategica.entity';
 import { DashboardModule } from './modules/dashboard/dashboard.module';
 
@@ -17,7 +18,7 @@ import { DashboardModule } from './modules/dashboard/dashboard.module';
         return {
           type: 'postgres',
           url: databaseUrl,
-          entities: [Noticia, SemanaEstrategica],
+          entities: [Noticia, Lixeira, SemanaEstrategica],
           synchronize: false,
           logging: true,
         };
@@ -26,7 +27,7 @@ import { DashboardModule } from './modules/dashboard/dashboard.module';
     }),
     NoticiasModule,
     SemanaEstrategicaModule,
-    DashboardModule
+    DashboardModule,
   ],
 })
 export class AppModule {}
