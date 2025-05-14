@@ -25,3 +25,37 @@ export class DashboardResponseDto {
   evolucaoNoticiasPorPeriodo: { data: string; quantidade: number }[];
   sentimentoNoticiasPorPeriodo: { data: string; positivas: number; negativas: number; neutras: number }[];
 }
+
+export class TotalResponseDto {
+  total: number;
+}
+
+export class NoticiasPorPeriodoItem {
+  data: string;
+  quantidade: number;
+}
+
+export class PontuacaoPorPeriodoItem {
+  data: string;
+  pontuacao: number;
+}
+
+export class SentimentoNoticiasItem {
+  data: string;
+  positivas: number;
+  negativas: number;
+  neutras: number;
+}
+
+export class DashEstrategicaResponseDto {
+  'dash-estrategica': {
+    'total-noticias-estratégicas': number;
+    'total-pontuacao-estratégicas': number;
+    'total-noticias-tema': {
+      'total-infraestrutura': number;
+      'total-social': number;
+      'total-educacao': number;
+      'total-saude': number;
+    };
+  }[];
+}

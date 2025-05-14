@@ -1,29 +1,16 @@
 import { Controller, Get, Query } from '@nestjs/common';
 import { ApiOperation, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { DashboardService } from './dashboard.service';
-import { DashboardFilterDto, DashboardResponseDto, PortalItem } from './dto/dashboard.dto';
-
-// Classes para documentação do Swagger
-export class TotalResponseDto {
-  total: number;
-}
-
-export class NoticiasPorPeriodoItem {
-  data: string;
-  quantidade: number;
-}
-
-export class PontuacaoPorPeriodoItem {
-  data: string;
-  pontuacao: number;
-}
-
-export class SentimentoNoticiasItem {
-  data: string;
-  positivas: number;
-  negativas: number;
-  neutras: number;
-}
+import {
+  DashboardFilterDto,
+  DashboardResponseDto,
+  PortalItem,
+  TotalResponseDto,
+  NoticiasPorPeriodoItem,
+  PontuacaoPorPeriodoItem,
+  SentimentoNoticiasItem,
+  DashEstrategicaResponseDto,
+} from './dto/dashboard.dto';
 
 @ApiTags('dashboard')
 @Controller('dashboard')
@@ -137,5 +124,14 @@ export class DashboardController {
   async getSentimentoNoticias(@Query() filter: DashboardFilterDto): Promise<SentimentoNoticiasItem[]> {
     const dashboardData = await this.dashboardService.getDashboardData(filter);
     return dashboardData.sentimentoNoticiasPorPeriodo;
+  }
+
+  @Get('dash-estrategica')
+  @ApiOperation({ summary: 'Obtém dados de notícias estratégicas no período' })
+  @ApiQuery({ name: 'dataInicio', required: false, type: String, description: 'Data inicial (YYYY-MM-DD)' })
+  @ApiQuery({ name: 'dataFim', required: false, type: String, description: 'Data final (YYYY-MM-DD)' })
+  @ApiResponse({ status: 200, description: 'Dados de notícias estratégicas', type: DashEstrategicaResponseDto })
+  async getDashEstrategica(@Query() filter: DashboardFilterDto): Promise<DashEstrategicaResponseDto> {
+    return this.dashboardService.getDashEstrategica(filter);
   }
 }

@@ -2,7 +2,7 @@ import { Injectable, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Noticia } from '../noticias/entities/noticia.entity';
-import { DashboardFilterDto, DashboardResponseDto, PortalItem } from './dto/dashboard.dto';
+import { DashboardFilterDto, DashboardResponseDto, PortalItem, DashEstrategicaResponseDto } from './dto/dashboard.dto';
 import * as moment from 'moment';
 
 // Interfaces para tipagem
@@ -321,5 +321,74 @@ export class DashboardService {
 
     console.log(`Total de portais relevantes negativos: ${portaisRelevantesNegativas.length}`);
     return portaisRelevantesNegativas;
+  }
+
+  async getDashEstrategica(filter: DashboardFilterDto): Promise<DashEstrategicaResponseDto> {
+    const { dataInicio, dataFim } = filter;
+
+    console.log('Iniciando consulta de dashboard estratégico com filtros:', {
+      dataInicio,
+      dataFim,
+    });
+
+    // Cria a query base
+    let queryBuilder = this.noticiaRepository.createQueryBuilder('noticia');
+
+    // Aplica o filtro de data
+    queryBuilder = this.applyDateFilter(queryBuilder, dataInicio, dataFim);
+
+    // Filtra apenas notícias estratégicas com categoria preenchida
+    queryBuilder = queryBuilder
+      .andWhere('noticia.estrategica = :estrategica', { estrategica: true })
+      .andWhere('noticia.categoria IS NOT NULL')
+      .andWhere("TRIM(noticia.categoria) != ''");
+
+    // Log da query SQL gerada
+    const sql = queryBuilder.getSql();
+    console.log('Query SQL gerada para dashboard estratégico:', sql);
+
+    const noticias = await queryBuilder.getMany();
+    console.log(`Total de notícias estratégicas com categoria preenchida encontradas: ${noticias.length}`);
+
+    // Calcula o total de notícias estratégicas
+    const totalNoticiasEstrategicas = noticias.length;
+
+    // Calcula a soma de pontos_new
+    const totalPontuacaoEstrategicas = noticias.reduce(
+      (sum, noticia) => sum + (noticia.pontos_new || 0),
+      0,
+    );
+
+    // Conta notícias por categoria
+    const categoriasValidas = ['Infraestrutura', 'Social', 'Educação', 'Saúde'];
+    const noticiasPorCategoria = noticias.reduce(
+      (acc, noticia) => {
+        const categoria = noticia.categoria ? noticia.categoria.trim() : null;
+        if (categoria && categoriasValidas.includes(categoria)) {
+          acc[categoria] = (acc[categoria] || 0) + 1;
+        }
+        return acc;
+      },
+      {} as Record<string, number>,
+    );
+
+    // Prepara o objeto de resposta
+    const response: DashEstrategicaResponseDto = {
+      'dash-estrategica': [
+        {
+          'total-noticias-estratégicas': totalNoticiasEstrategicas,
+          'total-pontuacao-estratégicas': totalPontuacaoEstrategicas,
+          'total-noticias-tema': {
+            'total-infraestrutura': noticiasPorCategoria['Infraestrutura'] || 0,
+            'total-social': noticiasPorCategoria['Social'] || 0,
+            'total-educacao': noticiasPorCategoria['Educação'] || 0,
+            'total-saude': noticiasPorCategoria['Saúde'] || 0,
+          },
+        },
+      ],
+    };
+
+    console.log('Resposta do dashboard estratégico:', JSON.stringify(response, null, 2));
+    return response;
   }
 }
