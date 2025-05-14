@@ -47,15 +47,18 @@ export class SentimentoNoticiasItem {
   neutras: number;
 }
 
+export class NoticiasTemaPorDataItem {
+  data: string;
+  'total-infraestrutura': number;
+  'total-social': number;
+  'total-educacao': number;
+  'total-saude': number;
+}
+
 export class DashEstrategicaResponseDto {
   'dash-estrategica': {
     'total-noticias-estratégicas': number;
     'total-pontuacao-estratégicas': number;
-    'total-noticias-tema': {
-      'total-infraestrutura': number;
-      'total-social': number;
-      'total-educacao': number;
-      'total-saude': number;
-    };
+    'total-noticias-tema': NoticiasTemaPorDataItem[];
   }[];
 }

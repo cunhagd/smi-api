@@ -16,6 +16,14 @@ interface NoticiaDataItem {
   avaliacoes?: Set<string>;
 }
 
+interface TemaDataItem {
+  data: string;
+  'total-infraestrutura': number;
+  'total-social': number;
+  'total-educacao': number;
+  'total-saude': number;
+}
+
 @Injectable()
 export class DashboardService {
   constructor(
@@ -359,17 +367,52 @@ export class DashboardService {
       0,
     );
 
-    // Conta notícias por categoria
+    // Agrupa notícias por data e categoria
     const categoriasValidas = ['Infraestrutura', 'Social', 'Educação', 'Saúde'];
-    const noticiasPorCategoria = noticias.reduce(
+    const noticiasPorData: Record<string, TemaDataItem> = noticias.reduce(
       (acc, noticia) => {
+        if (!noticia.data) return acc;
+
+        // Converte a data do banco (DD/MM/YYYY) para YYYY-MM-DD
+        const dataObj = moment(noticia.data, 'DD/MM/YYYY', true);
+        const data = dataObj.isValid() ? dataObj.format('YYYY-MM-DD') : noticia.data;
+
+        if (!acc[data]) {
+          acc[data] = {
+            data,
+            'total-infraestrutura': 0,
+            'total-social': 0,
+            'total-educacao': 0,
+            'total-saude': 0,
+          };
+        }
+
         const categoria = noticia.categoria ? noticia.categoria.trim() : null;
         if (categoria && categoriasValidas.includes(categoria)) {
-          acc[categoria] = (acc[categoria] || 0) + 1;
+          switch (categoria) {
+            case 'Infraestrutura':
+              acc[data]['total-infraestrutura'] += 1;
+              break;
+            case 'Social':
+              acc[data]['total-social'] += 1;
+              break;
+            case 'Educação':
+              acc[data]['total-educacao'] += 1;
+              break;
+            case 'Saúde':
+              acc[data]['total-saude'] += 1;
+              break;
+          }
         }
+
         return acc;
       },
-      {} as Record<string, number>,
+      {} as Record<string, TemaDataItem>,
+    );
+
+    // Converte para array e ordena por data
+    const noticiasTemaPorData = Object.values(noticiasPorData).sort(
+      (a, b) => moment(a.data).valueOf() - moment(b.data).valueOf(),
     );
 
     // Prepara o objeto de resposta
@@ -378,12 +421,7 @@ export class DashboardService {
         {
           'total-noticias-estratégicas': totalNoticiasEstrategicas,
           'total-pontuacao-estratégicas': totalPontuacaoEstrategicas,
-          'total-noticias-tema': {
-            'total-infraestrutura': noticiasPorCategoria['Infraestrutura'] || 0,
-            'total-social': noticiasPorCategoria['Social'] || 0,
-            'total-educacao': noticiasPorCategoria['Educação'] || 0,
-            'total-saude': noticiasPorCategoria['Saúde'] || 0,
-          },
+          'total-noticias-tema': noticiasTemaPorData,
         },
       ],
     };
