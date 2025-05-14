@@ -121,17 +121,24 @@ export class DashboardService {
     // Aplica o filtro de data
     queryBuilder = this.applyDateFilter(queryBuilder, dataInicio, dataFim, forceLast30Days);
 
+    // Filtra apenas notícias úteis com avaliação válida
+    queryBuilder = queryBuilder
+      .andWhere('noticia.relevancia = :relevancia', { relevancia: 'Útil' })
+      .andWhere('noticia.avaliacao IN (:...avaliacoes)', { avaliacoes: ['Positiva', 'Negativa', 'Neutra'] });
+
     // Log da query SQL gerada
     const sql = queryBuilder.getSql();
     console.log('Query SQL gerada:', sql);
 
     const noticias = await queryBuilder.getMany();
-    console.log(`Total de notícias encontradas: ${noticias.length}`);
+    console.log(`Total de notícias úteis com avaliação válida encontradas: ${noticias.length}`);
     if (noticias.length > 0) {
       console.log('Primeiros registros:', noticias.slice(0, 2));
-      // Log dos valores únicos de avaliacao
+      // Log dos valores únicos de avaliacao e relevancia
       const avaliacoes = [...new Set(noticias.map((n) => n.avaliacao))];
+      const relevancias = [...new Set(noticias.map((n) => n.relevancia))];
       console.log('Valores únicos de avaliacao:', avaliacoes);
+      console.log('Valores únicos de relevancia:', relevancias);
     }
 
     // Prepara os dados do dashboard
