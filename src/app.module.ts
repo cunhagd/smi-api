@@ -7,6 +7,8 @@ import { Noticia } from './modules/noticias/entities/noticia.entity';
 import { Lixeira } from './modules/noticias/entities/lixeira.entity';
 import { SemanaEstrategica } from './modules/semana-estrategica/entities/semana-estrategica.entity';
 import { DashboardModule } from './modules/dashboard/dashboard.module';
+import { PortaisModule } from './modules/portais/portais.module';
+import { Portal } from './modules/portais/entities/portais.entity';
 
 @Module({
   imports: [
@@ -18,7 +20,7 @@ import { DashboardModule } from './modules/dashboard/dashboard.module';
         return {
           type: 'postgres',
           url: databaseUrl,
-          entities: [Noticia, Lixeira, SemanaEstrategica],
+          entities: [Noticia, Lixeira, SemanaEstrategica, Portal],
           synchronize: false,
           logging: true,
         };
@@ -28,6 +30,7 @@ import { DashboardModule } from './modules/dashboard/dashboard.module';
     NoticiasModule,
     SemanaEstrategicaModule,
     DashboardModule,
+    PortaisModule,
   ],
 })
 export class AppModule {}
