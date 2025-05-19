@@ -253,6 +253,7 @@ export class DashboardService {
       .createQueryBuilder('noticia')
       .select('noticia.portal', 'portal')
       .addSelect('SUM(COALESCE(noticia.pontos_new, 0))', 'pontuacao')
+      .addSelect('COUNT(*)', 'qtd')
       .where('noticia.portal IS NOT NULL')
       .andWhere("TRIM(noticia.portal) != ''");
 
@@ -275,6 +276,7 @@ export class DashboardService {
     const portais = resultados.map((item) => ({
       portal: item.portal,
       pontuacao: parseFloat(item.pontuacao) || 0,
+      qtd: parseInt(item.qtd, 10) || 0,
     }));
 
     // Ordena por pontuação (maior para menor) e pega os 5 primeiros
@@ -299,6 +301,7 @@ export class DashboardService {
       .createQueryBuilder('noticia')
       .select('noticia.portal', 'portal')
       .addSelect('SUM(COALESCE(noticia.pontos_new, 0))', 'pontuacao')
+      .addSelect('COUNT(*)', 'qtd')
       .where('noticia.portal IS NOT NULL')
       .andWhere("TRIM(noticia.portal) != ''");
 
@@ -321,6 +324,7 @@ export class DashboardService {
     const portais = resultados.map((item) => ({
       portal: item.portal,
       pontuacao: parseFloat(item.pontuacao) || 0,
+      qtd: parseInt(item.qtd, 10) || 0,
     }));
 
     // Ordena por pontuação (menor para maior) e pega os 5 primeiros

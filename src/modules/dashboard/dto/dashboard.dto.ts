@@ -13,6 +13,7 @@ export class DashboardFilterDto {
 export class PortalItem {
   portal: string;
   pontuacao: number;
+  qtd: number; 
 }
 
 export class DashboardResponseDto {
