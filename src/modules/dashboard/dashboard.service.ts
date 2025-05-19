@@ -253,7 +253,7 @@ export class DashboardService {
       .createQueryBuilder('noticia')
       .select('noticia.portal', 'portal')
       .addSelect('SUM(COALESCE(noticia.pontos_new, 0))', 'pontuacao')
-      .addSelect('COUNT(*)', 'qtd')
+      .addSelect("COUNT(CASE WHEN noticia.pontos_new IS NOT NULL AND noticia.pontos_new != 0 THEN 1 END)", 'qtd')
       .where('noticia.portal IS NOT NULL')
       .andWhere("TRIM(noticia.portal) != ''");
 
@@ -301,7 +301,7 @@ export class DashboardService {
       .createQueryBuilder('noticia')
       .select('noticia.portal', 'portal')
       .addSelect('SUM(COALESCE(noticia.pontos_new, 0))', 'pontuacao')
-      .addSelect('COUNT(*)', 'qtd')
+      .addSelect("COUNT(CASE WHEN noticia.pontos_new IS NOT NULL AND noticia.pontos_new != 0 THEN 1 END)", 'qtd')
       .where('noticia.portal IS NOT NULL')
       .andWhere("TRIM(noticia.portal) != ''");
 
