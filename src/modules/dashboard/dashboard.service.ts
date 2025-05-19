@@ -252,15 +252,17 @@ export class DashboardService {
     let queryBuilder = this.noticiaRepository
       .createQueryBuilder('noticia')
       .select('noticia.portal', 'portal')
-      .addSelect('SUM(noticia.pontos_new)', 'pontuacao')
+      .addSelect('SUM(COALESCE(noticia.pontos_new, 0))', 'pontuacao')
       .where('noticia.portal IS NOT NULL')
       .andWhere("TRIM(noticia.portal) != ''");
 
     // Aplica o filtro de data
     queryBuilder = this.applyDateFilter(queryBuilder, dataInicio, dataFim);
 
-    // Agrupa por portal
-    queryBuilder = queryBuilder.groupBy('noticia.portal');
+    // Agrupa por portal e filtra apenas pontuações positivas
+    queryBuilder = queryBuilder
+      .groupBy('noticia.portal')
+      .having('SUM(COALESCE(noticia.pontos_new, 0)) > 0');
 
     // Log da query SQL gerada
     const sql = queryBuilder.getSql();
@@ -296,15 +298,17 @@ export class DashboardService {
     let queryBuilder = this.noticiaRepository
       .createQueryBuilder('noticia')
       .select('noticia.portal', 'portal')
-      .addSelect('SUM(noticia.pontos_new)', 'pontuacao')
+      .addSelect('SUM(COALESCE(noticia.pontos_new, 0))', 'pontuacao')
       .where('noticia.portal IS NOT NULL')
       .andWhere("TRIM(noticia.portal) != ''");
 
     // Aplica o filtro de data
     queryBuilder = this.applyDateFilter(queryBuilder, dataInicio, dataFim);
 
-    // Agrupa por portal
-    queryBuilder = queryBuilder.groupBy('noticia.portal');
+    // Agrupa por portal e filtra apenas pontuações negativas
+    queryBuilder = queryBuilder
+      .groupBy('noticia.portal')
+      .having('SUM(COALESCE(noticia.pontos_new, 0)) < 0');
 
     // Log da query SQL gerada
     const sql = queryBuilder.getSql();
