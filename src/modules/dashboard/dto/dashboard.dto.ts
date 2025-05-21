@@ -13,7 +13,13 @@ export class DashboardFilterDto {
 export class PortalItem {
   portal: string;
   pontuacao: number;
-  qtd: number; 
+  quantidade: number;
+  positivo: number;
+  negativo: number;
+  neutro: number;
+  '%positivo': string;
+  '%negativo': string;
+  '%neutro': string;
 }
 
 export class DashboardResponseDto {
