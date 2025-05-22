@@ -283,8 +283,7 @@ export class DashboardService {
           };
         }
         acc[portalNome].pontuacao! += noticia.pontos_new || 0;
-        acc[portalNome].quantidade! += 1;
-        acc[portalNome].positivo! += 1; // Como a query filtra apenas Positiva, todas são positivas
+        acc[portalNome].positivo! += 1; // Conta apenas positivas aqui
         return acc;
       },
       {} as Record<string, Partial<PortalItem>>,
@@ -298,7 +297,6 @@ export class DashboardService {
         .select('noticia.portal', 'portal')
         .addSelect("SUM(CASE WHEN noticia.avaliacao = 'Negativa' THEN 1 ELSE 0 END)", 'negativo')
         .addSelect("SUM(CASE WHEN noticia.avaliacao = 'Neutra' THEN 1 ELSE 0 END)", 'neutro')
-        .addSelect('COUNT(*)', 'quantidade_total')
         .where('noticia.portal IN (:...portais)', { portais })
         .andWhere('noticia.avaliacao IN (:...avaliacoes)', { avaliacoes: ['Negativa', 'Neutra'] });
 
@@ -314,7 +312,6 @@ export class DashboardService {
         if (portalMap[portalNome]) {
           portalMap[portalNome].negativo = parseInt(result.negativo, 10) || 0;
           portalMap[portalNome].neutro = parseInt(result.neutro, 10) || 0;
-          portalMap[portalNome].quantidade! += parseInt(result.quantidade_total, 10) || 0;
         }
       });
     }
@@ -322,10 +319,10 @@ export class DashboardService {
     // Formata o resultado final com percentuais
     const portaisRelevantesPositivas = Object.values(portalMap)
       .map((item) => {
-        const quantidade = item.quantidade || 0;
         const positivo = item.positivo || 0;
         const negativo = item.negativo || 0;
         const neutro = item.neutro || 0;
+        const quantidade = positivo + negativo + neutro; // Quantidade é a soma de todos os sentimentos
         const percentualPositivo = quantidade > 0 ? ((positivo / quantidade) * 100).toFixed(0) + '%' : '0%';
         const percentualNegativo = quantidade > 0 ? ((negativo / quantidade) * 100).toFixed(0) + '%' : '0%';
         const percentualNeutro = quantidade > 0 ? ((neutro / quantidade) * 100).toFixed(0) + '%' : '0%';
@@ -392,8 +389,7 @@ export class DashboardService {
           };
         }
         acc[portalNome].pontuacao! += noticia.pontos_new || 0;
-        acc[portalNome].quantidade! += 1;
-        acc[portalNome].negativo! += 1; // Como a query filtra apenas Negativa, todas são negativas
+        acc[portalNome].negativo! += 1; // Conta apenas negativas aqui
         return acc;
       },
       {} as Record<string, Partial<PortalItem>>,
@@ -407,7 +403,6 @@ export class DashboardService {
         .select('noticia.portal', 'portal')
         .addSelect("SUM(CASE WHEN noticia.avaliacao = 'Positiva' THEN 1 ELSE 0 END)", 'positivo')
         .addSelect("SUM(CASE WHEN noticia.avaliacao = 'Neutra' THEN 1 ELSE 0 END)", 'neutro')
-        .addSelect('COUNT(*)', 'quantidade_total')
         .where('noticia.portal IN (:...portais)', { portais })
         .andWhere('noticia.avaliacao IN (:...avaliacoes)', { avaliacoes: ['Positiva', 'Neutra'] });
 
@@ -423,7 +418,6 @@ export class DashboardService {
         if (portalMap[portalNome]) {
           portalMap[portalNome].positivo = parseInt(result.positivo, 10) || 0;
           portalMap[portalNome].neutro = parseInt(result.neutro, 10) || 0;
-          portalMap[portalNome].quantidade! += parseInt(result.quantidade_total, 10) || 0;
         }
       });
     }
@@ -431,10 +425,10 @@ export class DashboardService {
     // Formata o resultado final com percentuais
     const portaisRelevantesNegativas = Object.values(portalMap)
       .map((item) => {
-        const quantidade = item.quantidade || 0;
         const positivo = item.positivo || 0;
         const negativo = item.negativo || 0;
         const neutro = item.neutro || 0;
+        const quantidade = positivo + negativo + neutro; // Quantidade é a soma de todos os sentimentos
         const percentualPositivo = quantidade > 0 ? ((positivo / quantidade) * 100).toFixed(0) + '%' : '0%';
         const percentualNegativo = quantidade > 0 ? ((negativo / quantidade) * 100).toFixed(0) + '%' : '0%';
         const percentualNeutro = quantidade > 0 ? ((neutro / quantidade) * 100).toFixed(0) + '%' : '0%';
