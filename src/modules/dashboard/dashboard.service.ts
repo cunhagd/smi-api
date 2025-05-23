@@ -2,6 +2,7 @@ import { Injectable, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Noticia } from '../noticias/entities/noticia.entity';
+import { Portal } from '../portais/entities/portais.entity';
 import { DashboardFilterDto, DashboardResponseDto, PortalItem, DashEstrategicaResponseDto } from './dto/dashboard.dto';
 import * as moment from 'moment';
 
@@ -24,11 +25,22 @@ interface TemaDataItem {
   'total-saude': number;
 }
 
+// Interface auxiliar para portalMap, incluindo pontos
+interface PortalItemInternal {
+  portal: string;
+  pontos?: number;
+  positivo: number;
+  negativo: number;
+  neutro: number;
+}
+
 @Injectable()
 export class DashboardService {
   constructor(
     @InjectRepository(Noticia)
     private noticiaRepository: Repository<Noticia>,
+    @InjectRepository(Portal)
+    private portalRepository: Repository<Portal>,
   ) {}
 
   private applyDateFilter(
@@ -248,48 +260,47 @@ export class DashboardService {
       dataFim,
     });
 
-    // Cria a query base para notícias positivas
-    let queryBuilder = this.noticiaRepository.createQueryBuilder('noticia');
+    // Cria a query base para notícias positivas com join na tabela portais
+    let queryBuilder = this.noticiaRepository
+      .createQueryBuilder('noticia')
+      .leftJoin('portais', 'portal', 'portal.nome = noticia.portal')
+      .select([
+        'noticia.portal AS portal',
+        'SUM(CASE WHEN noticia.avaliacao = :avaliacao THEN 1 ELSE 0 END) AS positivo',
+        'portal.pontos AS pontos',
+      ])
+      .where('noticia.avaliacao = :avaliacao', { avaliacao: 'Positiva' })
+      .groupBy('noticia.portal, portal.pontos');
 
     // Aplica o filtro de data
     queryBuilder = this.applyDateFilter(queryBuilder, dataInicio, dataFim);
-
-    // Filtra apenas notícias positivas
-    queryBuilder = queryBuilder.andWhere('noticia.avaliacao = :avaliacao', { avaliacao: 'Positiva' });
 
     // Log da query SQL gerada
     const sql = queryBuilder.getSql();
     console.log('Query SQL gerada para portais positivos:', sql);
 
-    const noticias = await queryBuilder.getMany();
-    console.log(`Total de notícias positivas encontradas: ${noticias.length}`);
+    const noticiasPositivas = await queryBuilder.getRawMany();
+    console.log(`Total de portais com notícias positivas encontradas: ${noticiasPositivas.length}`);
 
-    // Agrupa notícias por portal e calcula métricas
-    const portalMap: Record<string, Partial<PortalItem>> = noticias.reduce(
-      (acc, noticia) => {
-        if (!noticia.portal) return acc;
-
-        const portalNome = noticia.portal.trim();
+    // Mapa para armazenar métricas por portal
+    const portalMap: Record<string, PortalItemInternal> = noticiasPositivas.reduce(
+      (acc, item) => {
+        const portalNome = item.portal?.trim();
         if (!portalNome) return acc;
 
-        if (!acc[portalNome]) {
-          acc[portalNome] = {
-            portal: portalNome,
-            pontuacao: 0,
-            quantidade: 0,
-            positivo: 0,
-            negativo: 0,
-            neutro: 0,
-          };
-        }
-        acc[portalNome].pontuacao! += noticia.pontos_new || 0;
-        acc[portalNome].positivo! += 1; // Conta apenas positivas aqui
+        acc[portalNome] = {
+          portal: portalNome,
+          pontos: parseInt(item.pontos, 10) || 0,
+          positivo: parseInt(item.positivo, 10) || 0,
+          negativo: 0,
+          neutro: 0,
+        };
         return acc;
       },
-      {} as Record<string, Partial<PortalItem>>,
+      {} as Record<string, PortalItemInternal>,
     );
 
-    // Query auxiliar para contar notícias negativas e neutras para os portais encontrados
+    // Query auxiliar para contar notícias negativas e neutras
     const portais = Object.keys(portalMap);
     if (portais.length > 0) {
       const sentimentQuery = this.noticiaRepository
@@ -308,7 +319,7 @@ export class DashboardService {
       const sentimentResults = await sentimentQuery.getRawMany();
 
       sentimentResults.forEach((result) => {
-        const portalNome = result.portal;
+        const portalNome = result.portal?.trim();
         if (portalMap[portalNome]) {
           portalMap[portalNome].negativo = parseInt(result.negativo, 10) || 0;
           portalMap[portalNome].neutro = parseInt(result.neutro, 10) || 0;
@@ -316,20 +327,24 @@ export class DashboardService {
       });
     }
 
-    // Formata o resultado final com percentuais
+    // Formata o resultado final com percentuais e pontuação ajustada
     const portaisRelevantesPositivas = Object.values(portalMap)
+      .filter((item) => item.pontos !== undefined) // Ignora portais sem pontos
       .map((item) => {
         const positivo = item.positivo || 0;
         const negativo = item.negativo || 0;
         const neutro = item.neutro || 0;
-        const quantidade = positivo + negativo + neutro; // Quantidade é a soma de todos os sentimentos
+        const quantidade = positivo + negativo + neutro;
         const percentualPositivo = quantidade > 0 ? ((positivo / quantidade) * 100).toFixed(0) + '%' : '0%';
         const percentualNegativo = quantidade > 0 ? ((negativo / quantidade) * 100).toFixed(0) + '%' : '0%';
         const percentualNeutro = quantidade > 0 ? ((neutro / quantidade) * 100).toFixed(0) + '%' : '0%';
 
+        // Calcula pontuação: (positivo * pontos) - (negativo * pontos)
+        const pontuacao = (positivo * (item.pontos || 0)) - (negativo * (item.pontos || 0));
+
         return {
-          portal: item.portal!,
-          pontuacao: item.pontuacao || 0,
+          portal: item.portal,
+          pontuacao,
           quantidade,
           positivo,
           negativo,
@@ -354,48 +369,47 @@ export class DashboardService {
       dataFim,
     });
 
-    // Cria a query base para notícias negativas
-    let queryBuilder = this.noticiaRepository.createQueryBuilder('noticia');
+    // Cria a query base para notícias negativas com join na tabela portais
+    let queryBuilder = this.noticiaRepository
+      .createQueryBuilder('noticia')
+      .leftJoin('portais', 'portal', 'portal.nome = noticia.portal')
+      .select([
+        'noticia.portal AS portal',
+        'SUM(CASE WHEN noticia.avaliacao = :avaliacao THEN 1 ELSE 0 END) AS negativo',
+        'portal.pontos AS pontos',
+      ])
+      .where('noticia.avaliacao = :avaliacao', { avaliacao: 'Negativa' })
+      .groupBy('noticia.portal, portal.pontos');
 
     // Aplica o filtro de data
     queryBuilder = this.applyDateFilter(queryBuilder, dataInicio, dataFim);
-
-    // Filtra apenas notícias negativas
-    queryBuilder = queryBuilder.andWhere('noticia.avaliacao = :avaliacao', { avaliacao: 'Negativa' });
 
     // Log da query SQL gerada
     const sql = queryBuilder.getSql();
     console.log('Query SQL gerada para portais negativos:', sql);
 
-    const noticias = await queryBuilder.getMany();
-    console.log(`Total de notícias negativas encontradas: ${noticias.length}`);
+    const noticiasNegativas = await queryBuilder.getRawMany();
+    console.log(`Total de portais com notícias negativas encontradas: ${noticiasNegativas.length}`);
 
-    // Agrupa notícias por portal e calcula métricas
-    const portalMap: Record<string, Partial<PortalItem>> = noticias.reduce(
-      (acc, noticia) => {
-        if (!noticia.portal) return acc;
-
-        const portalNome = noticia.portal.trim();
+    // Mapa para armazenar métricas por portal
+    const portalMap: Record<string, PortalItemInternal> = noticiasNegativas.reduce(
+      (acc, item) => {
+        const portalNome = item.portal?.trim();
         if (!portalNome) return acc;
 
-        if (!acc[portalNome]) {
-          acc[portalNome] = {
-            portal: portalNome,
-            pontuacao: 0,
-            quantidade: 0,
-            positivo: 0,
-            negativo: 0,
-            neutro: 0,
-          };
-        }
-        acc[portalNome].pontuacao! += noticia.pontos_new || 0;
-        acc[portalNome].negativo! += 1; // Conta apenas negativas aqui
+        acc[portalNome] = {
+          portal: portalNome,
+          pontos: parseInt(item.pontos, 10) || 0,
+          positivo: 0,
+          negativo: parseInt(item.negativo, 10) || 0,
+          neutro: 0,
+        };
         return acc;
       },
-      {} as Record<string, Partial<PortalItem>>,
+      {} as Record<string, PortalItemInternal>,
     );
 
-    // Query auxiliar para contar notícias positivas e neutras para os portais encontrados
+    // Query auxiliar para contar notícias positivas e neutras
     const portais = Object.keys(portalMap);
     if (portais.length > 0) {
       const sentimentQuery = this.noticiaRepository
@@ -414,7 +428,7 @@ export class DashboardService {
       const sentimentResults = await sentimentQuery.getRawMany();
 
       sentimentResults.forEach((result) => {
-        const portalNome = result.portal;
+        const portalNome = result.portal?.trim();
         if (portalMap[portalNome]) {
           portalMap[portalNome].positivo = parseInt(result.positivo, 10) || 0;
           portalMap[portalNome].neutro = parseInt(result.neutro, 10) || 0;
@@ -422,20 +436,24 @@ export class DashboardService {
       });
     }
 
-    // Formata o resultado final com percentuais
+    // Formata o resultado final com percentuais e pontuação ajustada
     const portaisRelevantesNegativas = Object.values(portalMap)
+      .filter((item) => item.pontos !== undefined) // Ignora portais sem pontos
       .map((item) => {
         const positivo = item.positivo || 0;
         const negativo = item.negativo || 0;
         const neutro = item.neutro || 0;
-        const quantidade = positivo + negativo + neutro; // Quantidade é a soma de todos os sentimentos
+        const quantidade = positivo + negativo + neutro;
         const percentualPositivo = quantidade > 0 ? ((positivo / quantidade) * 100).toFixed(0) + '%' : '0%';
         const percentualNegativo = quantidade > 0 ? ((negativo / quantidade) * 100).toFixed(0) + '%' : '0%';
         const percentualNeutro = quantidade > 0 ? ((neutro / quantidade) * 100).toFixed(0) + '%' : '0%';
 
+        // Calcula pontuação: (positivo * pontos) - (negativo * pontos)
+        const pontuacao = (positivo * (item.pontos || 0)) - (negativo * (item.pontos || 0));
+
         return {
-          portal: item.portal!,
-          pontuacao: item.pontuacao || 0,
+          portal: item.portal,
+          pontuacao,
           quantidade,
           positivo,
           negativo,
