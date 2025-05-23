@@ -463,7 +463,8 @@ export class DashboardService {
           '%neutro': percentualNeutro,
         } as PortalItem;
       })
-      .sort((a, b) => b.pontuacao - a.pontuacao)
+      .filter((item) => item.pontuacao < 0) // Garante que apenas pontuações negativas sejam incluídas
+      .sort((a, b) => a.pontuacao - b.pontuacao) // Ordena do mais negativo (menor) ao menos negativo (maior)
       .slice(0, 5);
 
     console.log(`Total de portais relevantes negativos: ${portaisRelevantesNegativas.length}`);
