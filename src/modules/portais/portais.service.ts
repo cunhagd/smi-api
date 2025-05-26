@@ -2,7 +2,7 @@ import { Injectable, NotFoundException, BadRequestException } from '@nestjs/comm
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Portal } from './entities/portais.entity';
-import { PortalResponseDto, CreatePortalDto } from './dto/portais.dto';
+import { PortalResponseDto, CreatePortalDto, PortalListResponseDto, UpdatePortalDto } from './dto/portais.dto';
 
 @Injectable()
 export class PortaisService {
@@ -32,8 +32,23 @@ export class PortaisService {
     };
   }
 
+  async findAll(): Promise<{ [key: string]: Omit<PortalListResponseDto, 'id' | 'nome'> }> {
+    const portais = await this.portaisRepository.find();
+    const result: { [key: string]: Omit<PortalListResponseDto, 'id' | 'nome'> } = {};
+
+    portais.forEach((portal) => {
+      result[portal.nome] = {
+        pontos: portal.pontos,
+        abrangencia: portal.abrangencia,
+        prioridade: portal.prioridade,
+        url: portal.url,
+      };
+    });
+
+    return result;
+  }
+
   async create(createPortalDto: CreatePortalDto): Promise<Portal> {
-    // Verificar se o nome do portal já existe
     const existingPortal = await this.portaisRepository.findOne({
       where: { nome: createPortalDto.nome.trim() },
     });
@@ -41,17 +56,37 @@ export class PortaisService {
       throw new BadRequestException(`Portal com nome "${createPortalDto.nome}" já existe`);
     }
 
-    // Mapear DTO para entidade
     const portal = new Portal();
     portal.nome = createPortalDto.nome.trim();
     portal.pontos = createPortalDto.pontos;
     portal.abrangencia = createPortalDto.abrangencia;
     portal.prioridade = createPortalDto.prioridade;
     portal.url = createPortalDto.url || null;
-    portal.nome2 = null; // Não fornecido pelo frontend
-    portal.nome_modulo = null; // Não fornecido pelo frontend
+    portal.nome2 = null;
+    portal.nome_modulo = null;
 
-    // Salvar no banco
+    return this.portaisRepository.save(portal);
+  }
+
+  async update(id: number, updatePortalDto: UpdatePortalDto): Promise<Portal> {
+    const portal = await this.portaisRepository.findOne({ where: { id } });
+    if (!portal) {
+      throw new NotFoundException(`Portal com ID "${id}" não encontrado`);
+    }
+
+    if (updatePortalDto.pontos !== undefined) {
+      portal.pontos = updatePortalDto.pontos;
+    }
+    if (updatePortalDto.abrangencia !== undefined) {
+      portal.abrangencia = updatePortalDto.abrangencia;
+    }
+    if (updatePortalDto.prioridade !== undefined) {
+      portal.prioridade = updatePortalDto.prioridade;
+    }
+    if (updatePortalDto.url !== undefined) {
+      portal.url = updatePortalDto.url;
+    }
+
     return this.portaisRepository.save(portal);
   }
 }
