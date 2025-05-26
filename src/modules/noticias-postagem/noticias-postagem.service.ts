@@ -4,6 +4,7 @@ import { Repository } from 'typeorm';
 import { NoticiaPostagem } from './entities/noticia-postagem.entity';
 import { CreateNoticiaPostagemDto } from './dto/create-noticia-postagem.dto';
 import { PortaisService } from '../portais/portais.service';
+import { Avaliacao } from './entities/noticia-postagem.entity';
 
 @Injectable()
 export class NoticiasPostagemService {
@@ -32,10 +33,15 @@ export class NoticiasPostagemService {
     noticia.estrategica = createNoticiaDto.estrategica === 'Sim' ? true : false;
     noticia.pontos = portal.pontos;
     noticia.abrangencia = portal.abrangencia;
-    // Campos não mencionados no requisito
-    noticia.relevancia = null;
+    noticia.relevancia = createNoticiaDto.relevancia;
     noticia.autor = null;
-    noticia.pontos_new = 0;
+    // Calcular pontos_new com base na avaliação
+    noticia.pontos_new =
+      createNoticiaDto.avaliacao === Avaliacao.POSITIVA
+        ? portal.pontos
+        : createNoticiaDto.avaliacao === Avaliacao.NEGATIVA
+        ? -portal.pontos
+        : 0; // Neutra
     noticia.categoria = null;
     noticia.subcategoria = null;
     noticia.ciclo = null;
