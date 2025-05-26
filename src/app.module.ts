@@ -9,6 +9,8 @@ import { SemanaEstrategica } from './modules/semana-estrategica/entities/semana-
 import { DashboardModule } from './modules/dashboard/dashboard.module';
 import { PortaisModule } from './modules/portais/portais.module';
 import { Portal } from './modules/portais/entities/portais.entity';
+import { NoticiasPostagemModule } from './modules/noticias-postagem/noticias-postagem.module';
+import { NoticiaPostagem } from './modules/noticias-postagem/entities/noticia-postagem.entity';
 
 @Module({
   imports: [
@@ -20,7 +22,8 @@ import { Portal } from './modules/portais/entities/portais.entity';
         return {
           type: 'postgres',
           url: databaseUrl,
-          entities: [Noticia, Lixeira, SemanaEstrategica, Portal],
+          entities: [Noticia, Lixeira, SemanaEstrategica, Portal, NoticiaPostagem], // Adiciona NoticiaPostagem
+          autoLoadEntities: true, // Carrega automaticamente entidades de forFeature
           synchronize: false,
           logging: true,
         };
@@ -31,6 +34,7 @@ import { Portal } from './modules/portais/entities/portais.entity';
     SemanaEstrategicaModule,
     DashboardModule,
     PortaisModule,
+    NoticiasPostagemModule,
   ],
 })
 export class AppModule {}

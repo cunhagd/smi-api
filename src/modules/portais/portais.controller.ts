@@ -1,6 +1,7 @@
-import { Controller, Get, Param, BadRequestException } from '@nestjs/common';
+import { Controller, Get, Post, Body, Param, BadRequestException, HttpException, HttpStatus } from '@nestjs/common';
 import { PortaisService } from './portais.service';
 import { PortalResponseDto } from './dto/portais.dto';
+import { CreatePortalDto } from './dto/portais.dto';
 import { ApiTags, ApiOperation, ApiResponse, ApiParam } from '@nestjs/swagger';
 
 @ApiTags('portais')
@@ -19,5 +20,14 @@ export class PortaisController {
       throw new BadRequestException('O nome do portal é obrigatório');
     }
     return this.portaisService.findByNome(nome);
+  }
+
+  @Post()
+  async create(@Body() createPortalDto: CreatePortalDto) {
+    try {
+      return await this.portaisService.create(createPortalDto);
+    } catch (error) {
+      throw new HttpException(error.message, HttpStatus.BAD_REQUEST);
+    }
   }
 }
