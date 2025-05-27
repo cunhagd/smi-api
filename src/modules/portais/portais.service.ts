@@ -32,12 +32,13 @@ export class PortaisService {
     };
   }
 
-  async findAll(): Promise<{ [key: string]: Omit<PortalListResponseDto, 'id' | 'nome'> }> {
+  async findAll(): Promise<{ [key: string]: Omit<PortalListResponseDto, 'nome'> }> {
     const portais = await this.portaisRepository.find();
-    const result: { [key: string]: Omit<PortalListResponseDto, 'id' | 'nome'> } = {};
+    const result: { [key: string]: Omit<PortalListResponseDto, 'nome'> } = {};
 
     portais.forEach((portal) => {
       result[portal.nome] = {
+        id: portal.id,
         pontos: portal.pontos,
         abrangencia: portal.abrangencia,
         prioridade: portal.prioridade,

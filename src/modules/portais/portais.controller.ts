@@ -14,12 +14,13 @@ export class PortaisController {
   @ApiOperation({ summary: 'Lista todos os portais cadastrados' })
   @ApiResponse({
     status: 200,
-    description: 'Lista de portais no formato { nome: { pontos, abrangencia, prioridade, url } }',
+    description: 'Lista de portais no formato { nome: { id, pontos, abrangencia, prioridade, url } }',
     schema: {
       type: 'object',
       additionalProperties: {
         type: 'object',
         properties: {
+          id: { type: 'integer', example: 1 },
           pontos: { type: 'integer', example: 50 },
           abrangencia: { type: 'string', example: 'Regional' },
           prioridade: { type: 'string', example: 'Alta' },
@@ -28,7 +29,7 @@ export class PortaisController {
       },
     },
   })
-  async findAll(): Promise<{ [key: string]: Omit<PortalListResponseDto, 'id' | 'nome'> }> {
+  async findAll(): Promise<{ [key: string]: Omit<PortalListResponseDto, 'nome'> }> {
     return this.portaisService.findAll();
   }
 
