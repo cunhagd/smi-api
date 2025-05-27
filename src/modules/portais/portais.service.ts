@@ -1,14 +1,19 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Portal } from './entities/portais.entity';
+import { LixeiraPortal } from './entities/lixeira-portal.entity';
 import { PortalResponseDto, CreatePortalDto, PortalListResponseDto, UpdatePortalDto } from './dto/portais.dto';
 
 @Injectable()
 export class PortaisService {
+  private readonly logger = new Logger(PortaisService.name);
+
   constructor(
     @InjectRepository(Portal)
     private portaisRepository: Repository<Portal>,
+    @InjectRepository(LixeiraPortal)
+    private lixeiraPortaisRepository: Repository<LixeiraPortal>,
   ) {}
 
   async findByNome(nome: string): Promise<PortalResponseDto> {
@@ -89,5 +94,30 @@ export class PortaisService {
     }
 
     return this.portaisRepository.save(portal);
+  }
+
+  async delete(id: number): Promise<{ message: string }> {
+    return await this.portaisRepository.manager.transaction(async (transactionalEntityManager) => {
+      const portal = await transactionalEntityManager.findOne(Portal, { where: { id } });
+      if (!portal) {
+        throw new NotFoundException(`Portal com ID "${id}" não encontrado`);
+      }
+
+      const lixeiraPortal = new LixeiraPortal();
+      lixeiraPortal.nome = portal.nome;
+      lixeiraPortal.pontos = portal.pontos;
+      lixeiraPortal.abrangencia = portal.abrangencia;
+      lixeiraPortal.prioridade = portal.prioridade;
+      lixeiraPortal.url = portal.url;
+      lixeiraPortal.nome2 = portal.nome2;
+      lixeiraPortal.nome_modulo = portal.nome_modulo;
+
+      this.logger.debug(`Copiando portal ID ${id} para lixeira: ${JSON.stringify(lixeiraPortal)}`);
+
+      await transactionalEntityManager.save(LixeiraPortal, lixeiraPortal);
+      await transactionalEntityManager.remove(Portal, portal);
+
+      return { message: 'Portal movido para lixeira' };
+    });
   }
 }

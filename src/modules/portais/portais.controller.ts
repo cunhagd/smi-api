@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Put, Body, Param, BadRequestException, HttpException, HttpStatus, UsePipes, ValidationPipe } from '@nestjs/common';
+import { Controller, Get, Post, Put, Delete, Body, Param, BadRequestException, HttpException, HttpStatus, UsePipes, ValidationPipe } from '@nestjs/common';
 import { PortaisService } from './portais.service';
 import { PortalResponseDto, CreatePortalDto, PortalListResponseDto, UpdatePortalDto } from './dto/portais.dto';
 import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiBody } from '@nestjs/swagger';
@@ -89,6 +89,27 @@ export class PortaisController {
     }
     try {
       return await this.portaisService.update(idNumber, updatePortalDto);
+    } catch (error) {
+      if (error instanceof NotFoundException) {
+        throw new HttpException(error.message, HttpStatus.NOT_FOUND);
+      }
+      throw new HttpException(error.message, HttpStatus.BAD_REQUEST);
+    }
+  }
+
+  @Delete('cadastrados/:id')
+  @ApiOperation({ summary: 'Remove um portal pelo ID e o move para a lixeira' })
+  @ApiParam({ name: 'id', description: 'ID do portal', example: 1 })
+  @ApiResponse({ status: 200, description: 'Portal movido para lixeira', schema: { type: 'object', properties: { message: { type: 'string', example: 'Portal movido para lixeira' } } } })
+  @ApiResponse({ status: 400, description: 'ID inválido' })
+  @ApiResponse({ status: 404, description: 'Portal não encontrado' })
+  async delete(@Param('id') id: string): Promise<{ message: string }> {
+    const idNumber = parseInt(id, 10);
+    if (isNaN(idNumber)) {
+      throw new BadRequestException('ID deve ser um número válido');
+    }
+    try {
+      return await this.portaisService.delete(idNumber);
     } catch (error) {
       if (error instanceof NotFoundException) {
         throw new HttpException(error.message, HttpStatus.NOT_FOUND);
