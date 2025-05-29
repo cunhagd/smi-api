@@ -69,3 +69,15 @@ export class DashEstrategicaResponseDto {
     'total-noticias-tema': NoticiasTemaPorDataItem[];
   }[];
 }
+
+export class NoticiasPorPeriodoMensalItem {
+  mes: string;
+  quantidade: number;
+}
+
+export class SentimentoNoticiasMensalItem {
+  mes: string;
+  positivas: number;
+  negativas: number;
+  neutras: number;
+}

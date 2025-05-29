@@ -3,7 +3,14 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Noticia } from '../noticias/entities/noticia.entity';
 import { Portal } from '../portais/entities/portais.entity';
-import { DashboardFilterDto, DashboardResponseDto, PortalItem, DashEstrategicaResponseDto } from './dto/dashboard.dto';
+import {
+  DashboardFilterDto,
+  DashboardResponseDto,
+  PortalItem,
+  DashEstrategicaResponseDto,
+  NoticiasPorPeriodoMensalItem,
+  SentimentoNoticiasMensalItem,
+} from './dto/dashboard.dto';
 import * as moment from 'moment';
 
 // Interfaces para tipagem
@@ -23,6 +30,18 @@ interface TemaDataItem {
   'total-social': number;
   'total-educacao': number;
   'total-saude': number;
+}
+
+interface NoticiaMensalItem {
+  mesAno: string;
+  quantidade: number;
+}
+
+interface SentimentoMensalItem {
+  mesAno: string;
+  positivas: number;
+  negativas: number;
+  neutras: number;
 }
 
 // Interface auxiliar para portalMap, incluindo pontos
@@ -113,6 +132,112 @@ export class DashboardService {
 
     console.log('Nenhum filtro de data aplicado');
     return queryBuilder;
+  }
+
+  async getNoticiasPorPeriodoMensal(): Promise<NoticiasPorPeriodoMensalItem[]> {
+    console.log('Iniciando consulta de notícias por período mensal');
+
+    // Mapeamento de números de mês para nomes em português
+    const mesesEmPortugues: { [key: number]: string } = {
+      1: 'Janeiro',
+      2: 'Fevereiro',
+      3: 'Março',
+      4: 'Abril',
+      5: 'Maio',
+      6: 'Junho',
+      7: 'Julho',
+      8: 'Agosto',
+      9: 'Setembro',
+      10: 'Outubro',
+      11: 'Novembro',
+      12: 'Dezembro',
+    };
+
+    // Cria a query base
+    let queryBuilder = this.noticiaRepository
+      .createQueryBuilder('noticia')
+      .select("TO_CHAR(TO_DATE(noticia.data, 'DD/MM/YYYY'), 'YYYY-MM')", 'mes_ano')
+      .addSelect('COUNT(*)', 'quantidade')
+      .where('noticia.relevancia = :relevancia', { relevancia: 'Útil' })
+      .andWhere('noticia.avaliacao IN (:...avaliacoes)', { avaliacoes: ['Positiva', 'Negativa', 'Neutra'] })
+      .groupBy("TO_CHAR(TO_DATE(noticia.data, 'DD/MM/YYYY'), 'YYYY-MM')")
+      .having('COUNT(*) > 0')
+      .orderBy("TO_CHAR(TO_DATE(noticia.data, 'DD/MM/YYYY'), 'YYYY-MM')", 'ASC');
+
+    // Log da query SQL gerada
+    const sql = queryBuilder.getSql();
+    console.log('Query SQL gerada para notícias por período mensal:', sql);
+
+    const noticiasMensais = await queryBuilder.getRawMany();
+    console.log(`Total de meses com notícias encontradas: ${noticiasMensais.length}`);
+
+    // Formata a resposta
+    const resultado = noticiasMensais.map((item: any) => {
+      const [ano, mes] = item.mes_ano.split('-').map(Number);
+      const mesNome = mesesEmPortugues[mes] || `Mês ${mes}`;
+      return {
+        mes: `${mesNome}`,
+        quantidade: parseInt(item.quantidade, 10),
+      } as NoticiasPorPeriodoMensalItem;
+    });
+
+    console.log('Resposta formatada:', JSON.stringify(resultado, null, 2));
+    return resultado;
+  }
+
+  async getSentimentoNoticiasMensal(): Promise<SentimentoNoticiasMensalItem[]> {
+    console.log('Iniciando consulta de sentimento de notícias por período mensal');
+
+    // Mapeamento de números de mês para nomes em português
+    const mesesEmPortugues: { [key: number]: string } = {
+      1: 'Janeiro',
+      2: 'Fevereiro',
+      3: 'Março',
+      4: 'Abril',
+      5: 'Maio',
+      6: 'Junho',
+      7: 'Julho',
+      8: 'Agosto',
+      9: 'Setembro',
+      10: 'Outubro',
+      11: 'Novembro',
+      12: 'Dezembro',
+    };
+
+    // Cria a query base
+    let queryBuilder = this.noticiaRepository
+      .createQueryBuilder('noticia')
+      .select("TO_CHAR(TO_DATE(noticia.data, 'DD/MM/YYYY'), 'YYYY-MM')", 'mes_ano')
+      .addSelect("SUM(CASE WHEN noticia.avaliacao = 'Positiva' THEN 1 ELSE 0 END)", 'positivas')
+      .addSelect("SUM(CASE WHEN noticia.avaliacao = 'Negativa' THEN 1 ELSE 0 END)", 'negativas')
+      .addSelect("SUM(CASE WHEN noticia.avaliacao = 'Neutra' THEN 1 ELSE 0 END)", 'neutras')
+      .where('noticia.relevancia = :relevancia', { relevancia: 'Útil' })
+      .andWhere('noticia.avaliacao IN (:...avaliacoes)', { avaliacoes: ['Positiva', 'Negativa', 'Neutra'] })
+      .groupBy("TO_CHAR(TO_DATE(noticia.data, 'DD/MM/YYYY'), 'YYYY-MM')")
+      .having("SUM(CASE WHEN noticia.avaliacao IN ('Positiva', 'Negativa', 'Neutra') THEN 1 ELSE 0 END) > 0")
+      .orderBy("TO_CHAR(TO_DATE(noticia.data, 'DD/MM/YYYY'), 'YYYY-MM')", 'ASC');
+
+    // Log da query SQL gerada
+    const sql = queryBuilder.getSql();
+    console.log('Query SQL gerada para sentimento de notícias por período mensal:', sql);
+
+    const noticiasMensais = await queryBuilder.getRawMany();
+    console.log(`Total de meses com notícias encontradas: ${noticiasMensais.length}`);
+
+    // Formata a resposta
+    const resultado = noticiasMensais.map((item: any) => {
+      const [ano, mes] = item.mes_ano.split('-').map(Number);
+      const mesNome = mesesEmPortugues[mes] || `Mês ${mes}`;
+      return {
+        mes: mesNome,
+        positivas: parseInt(item.positivas, 10) || 0,
+        negativas: parseInt(item.negativas, 10) || 0,
+        neutras: parseInt(item.neutras, 10) || 0,
+      } as SentimentoNoticiasMensalItem;
+    });
+
+    console.log('Resposta formatada:', JSON.stringify(resultado, null, 2));
+    return resultado;
   }
 
   async getDashboardData(

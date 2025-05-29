@@ -10,6 +10,8 @@ import {
   PontuacaoPorPeriodoItem,
   SentimentoNoticiasItem,
   DashEstrategicaResponseDto,
+  NoticiasPorPeriodoMensalItem,
+  SentimentoNoticiasMensalItem,
 } from './dto/dashboard.dto';
 
 @ApiTags('dashboard')
@@ -76,6 +78,20 @@ export class DashboardController {
   async getNoticiasPorPeriodo(@Query() filter: DashboardFilterDto): Promise<NoticiasPorPeriodoItem[]> {
     const dashboardData = await this.dashboardService.getDashboardData(filter);
     return dashboardData.noticiasPorPeriodo;
+  }
+
+  @Get('noticias-por-periodo-mensal')
+  @ApiOperation({ summary: 'Obtém quantidade de notícias por período mensal' })
+  @ApiResponse({ status: 200, description: 'Quantidade de notícias por mês', type: [NoticiasPorPeriodoMensalItem] })
+  async getNoticiasPorPeriodoMensal(): Promise<NoticiasPorPeriodoMensalItem[]> {
+    return this.dashboardService.getNoticiasPorPeriodoMensal();
+  }
+
+  @Get('sentimento-noticias-mensal')
+  @ApiOperation({ summary: 'Obtém sentimento das notícias por período mensal' })
+  @ApiResponse({ status: 200, description: 'Sentimento das notícias por mês', type: [SentimentoNoticiasMensalItem] })
+  async getSentimentoNoticiasMensal(): Promise<SentimentoNoticiasMensalItem[]> {
+    return this.dashboardService.getSentimentoNoticiasMensal();
   }
 
   @Get('pontuacao-por-periodo')
